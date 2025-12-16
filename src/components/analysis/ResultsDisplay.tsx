@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useAnalysis } from '@/contexts/AnalysisContext';
+import VisualSimulation from './VisualSimulation';
 
 export default function ResultsDisplay() {
   const { result, images, resetAnalysis } = useAnalysis();
@@ -51,19 +52,13 @@ export default function ResultsDisplay() {
         </CardContent>
       </Card>
 
-      {/* Images Preview */}
+      {/* Visual Simulation Section */}
       {images.length > 0 && (
-        <div className="grid grid-cols-3 gap-4">
-          {images.map((img) => (
-            <div key={img.id} className="rounded-xl overflow-hidden aspect-video">
-              <img 
-                src={img.preview} 
-                alt="Ambiente analisado" 
-                className="w-full h-full object-cover"
-              />
-            </div>
-          ))}
-        </div>
+        <VisualSimulation
+          originalImageUrl={images[0].preview}
+          optimizedImageUrl={result.visualSimulation?.optimizedImageUrl}
+          status={result.visualSimulation?.status || 'loading'}
+        />
       )}
 
       {/* Climate Analysis */}
