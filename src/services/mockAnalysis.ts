@@ -1,11 +1,14 @@
 // Serviço de análise mockado - preparado para integração futura com IA real
-import { AnalysisRequest, AnalysisResult } from '@/types/analysis';
+import { AnalysisRequest, AnalysisResult, SimulationStatus } from '@/types/analysis';
 
 // Simula delay de processamento
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Mock de análise baseado nos dados fornecidos
-export async function analyzeEnvironment(request: AnalysisRequest): Promise<AnalysisResult> {
+export async function analyzeEnvironment(
+  request: AnalysisRequest, 
+  originalImageUrl?: string
+): Promise<AnalysisResult> {
   // Simula tempo de processamento da IA
   await delay(3000);
   
@@ -72,8 +75,19 @@ export async function analyzeEnvironment(request: AnalysisRequest): Promise<Anal
     },
     materials: generateMaterialsList(formData),
     conceptualImageUrl: undefined, // Será preenchido pela API de geração de imagem
+    visualSimulation: {
+      originalImageUrl: originalImageUrl || '',
+      optimizedImageUrl: undefined,
+      status: 'loading' as SimulationStatus,
+    },
     disclaimer: 'Este diagnóstico apresenta estimativas conceituais baseadas em análise visual e informações fornecidas. Não substitui projeto técnico elaborado por profissional habilitado. Para execução das sugestões, consulte um arquiteto ou engenheiro.',
   };
+  
+  // Simula processamento da imagem otimizada (para demo, muda para 'error' após delay)
+  // Em produção, isso seria substituído pela chamada real à API de geração de imagem
+  setTimeout(() => {
+    result.visualSimulation!.status = 'error';
+  }, 2000);
   
   return result;
 }

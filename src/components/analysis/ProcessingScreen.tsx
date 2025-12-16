@@ -23,10 +23,13 @@ export default function ProcessingScreen() {
       setIsProcessing(true);
       
       try {
+        // Pega a URL da primeira imagem para a simulação visual
+        const originalImageUrl = images.length > 0 ? images[0].preview : undefined;
+        
         const result = await analyzeEnvironment({
           images,
           formData,
-        });
+        }, originalImageUrl);
         
         setResult(result);
         setCurrentStep(3);

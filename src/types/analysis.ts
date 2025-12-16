@@ -86,6 +86,14 @@ export interface MaterialsList {
   shading: MaterialItem[];
 }
 
+export type SimulationStatus = 'loading' | 'ready' | 'error';
+
+export interface VisualSimulation {
+  originalImageUrl: string;
+  optimizedImageUrl?: string;
+  status: SimulationStatus;
+}
+
 export interface AnalysisResult {
   id: string;
   createdAt: string;
@@ -95,5 +103,6 @@ export interface AnalysisResult {
   thermal: ThermalAnalysis;
   materials: MaterialsList;
   conceptualImageUrl?: string;
+  visualSimulation?: VisualSimulation;
   disclaimer: string;
 }
