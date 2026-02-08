@@ -4,14 +4,91 @@ import {
   ArrowLeft, Download, Share2, CheckCircle, Flame, Wind, Palette 
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
+import { EcomindsReport } from './EcomindsReport';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useAnalysis } from '@/contexts/AnalysisContext';
 import VisualSimulation from './VisualSimulation';
+import jsPDF from 'jspdf';
 
 export default function ResultsDisplay() {
   const { result, images, resetAnalysis } = useAnalysis();
+
+  // Função de Download movida para DENTRO do componente para acessar os dados facilmente
+  const handleDownloadPDF = () => {
+    if (!result) return;
+    const doc = new jsPDF();
+    
+    // --- CORES PREMIUM ---
+    const verdeEcominds = [45, 90, 70]; // Um verde musgo elegante, não "cheguei"
+    const cinzaTexto = [60, 60, 60];
+    const cinzaClaro = [240, 240, 240];
+
+    // --- CABEÇALHO MINIMALISTA ---
+    doc.setFillColor(verdeEcominds[0], verdeEcominds[1], verdeEcominds[2]);
+    doc.rect(0, 0, 210, 35, 'F'); // Barra superior mais fina
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("times", "bold"); // Times traz um ar mais sério/tradicional de engenharia
+    doc.setFontSize(22);
+    doc.text("ECOMINDSX", 20, 22);
+    
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text("CONSULTORIA EM ALTO DESEMPENHO AMBIENTAL", 20, 28);
+
+    // --- CORPO DO RELATÓRIO ---
+    doc.setTextColor(cinzaTexto[0], cinzaTexto[1], cinzaTexto[2]);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("DIAGNÓSTICO TÉCNICO EXECUTIVO", 20, 55);
+    
+    // Linha sutil de separação
+    doc.setDrawColor(220, 220, 220);
+    doc.line(20, 58, 190, 58);
+
+    // Texto de resumo com mais espaçamento (Leading)
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    const summary = doc.splitTextToSize(result.summary, 170);
+    doc.text(summary, 20, 68, { align: "justify", lineHeightFactor: 1.5 });
+
+    // --- SEÇÃO DE MATERIAIS (LAYOUT DE TABELA LIMPA) ---
+    let yPos = 110;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text("PLANO DE INVESTIMENTO E RETORNO", 20, yPos);
+    
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    
+    // Cabeçalho da Tabela
+    yPos += 8;
+    doc.setFillColor(cinzaClaro[0], cinzaClaro[1], cinzaClaro[2]);
+    doc.rect(20, yPos, 170, 8, 'F');
+    doc.text("ESPECIFICAÇÃO TÉCNICA | ESTIMATIVA DE PAYBACK", 25, yPos + 5);
+
+    // Itens da Tabela
+    if (result.thermal?.recommendedMaterials) {
+      result.thermal.recommendedMaterials.forEach((item: string) => {
+        yPos += 12;
+        doc.setDrawColor(240, 240, 240);
+        doc.line(20, yPos + 2, 190, yPos + 2); // Linha divisória fina
+        const splitItem = doc.splitTextToSize(item, 160);
+        doc.text(splitItem, 25, yPos);
+      });
+    }
+
+    // --- RODAPÉ ---
+    doc.setFontSize(8);
+    doc.setTextColor(180, 180, 180);
+    doc.text("Este documento contém análise proprietária baseada em inteligência climática.", 20, 285);
+    doc.text("Pág 01/01", 185, 285);
+
+    doc.save(`Relatorio_EcomindsX_Premium.pdf`);
+  };
 
   if (!result) {
     return (
@@ -72,27 +149,33 @@ export default function ResultsDisplay() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <h4 className="font-medium text-foreground mb-1">Clima da Região</h4>
-            <p className="text-muted-foreground">{result.climate.climate}</p>
-          </div>
-          <Separator />
-          <div>
-            <h4 className="font-medium text-foreground mb-1">Incidência Solar</h4>
-            <p className="text-muted-foreground">{result.climate.solarIncidence}</p>
-          </div>
-          <Separator />
-          <div>
-            <h4 className="font-medium text-foreground mb-2">Pontos Críticos Identificados</h4>
-            <ul className="space-y-2">
-              {result.climate.criticalPoints.map((point, i) => (
-                <li key={i} className="flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-accent mt-0.5 flex-shrink-0" />
-                  <span className="text-muted-foreground">{point}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {result.climate ? (
+            <>
+              <div>
+                <h4 className="font-medium text-foreground mb-1">Clima da Região</h4>
+                <p className="text-muted-foreground">{result.climate.climate}</p>
+              </div>
+              <Separator />
+              <div>
+                <h4 className="font-medium text-foreground mb-1">Incidência Solar</h4>
+                <p className="text-muted-foreground">{result.climate.solarIncidence}</p>
+              </div>
+              <Separator />
+              <div>
+                <h4 className="font-medium text-foreground mb-2">Pontos Críticos Identificados</h4>
+                <ul className="space-y-2">
+                  {result.climate.criticalPoints.map((point: string, i: number) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 text-accent mt-0.5 flex-shrink-0" />
+                      <span className="text-muted-foreground">{point}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </>
+          ) : (
+            <div className="text-muted-foreground">Nenhuma análise climática disponível.</div>
+          )}
         </CardContent>
       </Card>
 
@@ -110,7 +193,7 @@ export default function ResultsDisplay() {
           <div>
             <h4 className="font-medium text-foreground mb-3">Sugestões para Luz Natural</h4>
             <ul className="space-y-2">
-              {result.lighting.naturalLight.map((suggestion, i) => (
+              {result.lighting.naturalLight.map((suggestion: string, i: number) => (
                 <li key={i} className="flex items-start gap-2">
                   <CheckCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
                   <span className="text-muted-foreground">{suggestion}</span>
@@ -156,7 +239,7 @@ export default function ResultsDisplay() {
               Estratégias Passivas
             </h4>
             <ul className="space-y-2">
-              {result.thermal.passiveStrategies.map((strategy, i) => (
+              {result.thermal.passiveStrategies.map((strategy: string, i: number) => (
                 <li key={i} className="flex items-start gap-2">
                   <CheckCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
                   <span className="text-muted-foreground">{strategy}</span>
@@ -171,7 +254,7 @@ export default function ResultsDisplay() {
               Materiais Recomendados
             </h4>
             <ul className="space-y-2">
-              {result.thermal.recommendedMaterials.map((material, i) => (
+              {result.thermal.recommendedMaterials.map((material: string, i: number) => (
                 <li key={i} className="flex items-start gap-2">
                   <CheckCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
                   <span className="text-muted-foreground">{material}</span>
@@ -183,7 +266,7 @@ export default function ResultsDisplay() {
           <div>
             <h4 className="font-medium text-foreground mb-3">Ajustes Simples</h4>
             <div className="flex flex-wrap gap-2">
-              {result.thermal.simpleAdjustments.map((adjustment, i) => (
+              {result.thermal.simpleAdjustments.map((adjustment: string, i: number) => (
                 <Badge key={i} variant="secondary" className="py-1.5 px-3">
                   {adjustment}
                 </Badge>
@@ -195,14 +278,23 @@ export default function ResultsDisplay() {
 
       {/* Materials List */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-eco-earth/20 flex items-center justify-center">
-              <Package className="w-5 h-5 text-eco-earth" />
-            </div>
-            Lista de Materiais
-          </CardTitle>
-        </CardHeader>
+        {/* Pré-visualização do Relatório - Movido para o lugar certo */}
+<Card className="overflow-hidden border-2 border-primary/20 shadow-lg">
+  <CardHeader className="bg-primary/5 py-3">
+    <CardTitle className="text-sm font-bold flex items-center gap-2 text-primary">
+      <Leaf className="w-4 h-4" />
+      Relatório Executivo Gerado
+    </CardTitle>
+  </CardHeader>
+  <CardContent className="p-0">
+    <PDFViewer width="100%" height="600px" showToolbar={true} className="border-none">
+      <EcomindsReport 
+        result={result} 
+        formData={result.formData || { location: result?.location }} 
+      />
+    </PDFViewer>
+  </CardContent>
+</Card>
         <CardContent className="space-y-6">
           <MaterialCategory 
             title="Iluminação" 
@@ -243,10 +335,17 @@ export default function ResultsDisplay() {
 
       {/* Actions */}
       <div className="flex flex-col sm:flex-row gap-4 justify-center">
-        <Button variant="outline" className="gap-2">
-          <Download className="w-4 h-4" />
-          Baixar Relatório
-        </Button>
+        <PDFDownloadLink 
+          document={<EcomindsReport result={result} formData={result.formData || { location: result?.location }} />} 
+          fileName={`EcomindsX_Relatorio_${result.id}.pdf`}
+        >
+          {({ loading }) => (
+            <Button variant="outline" className="gap-2" disabled={loading}>
+              <Download className="w-4 h-4" />
+              {loading ? 'Gerando...' : 'Baixar Relatório Executivo'}
+            </Button>
+          )}
+        </PDFDownloadLink>
         <Button variant="outline" className="gap-2">
           <Share2 className="w-4 h-4" />
           Compartilhar
@@ -271,14 +370,11 @@ function MaterialCategory({
   items 
 }: { 
   title: string; 
-  icon: typeof Lightbulb;
-  items: Array<{
-    name: string;
-    description: string;
-    purpose: string;
-    estimatedQuantity?: string;
-  }>;
+  icon: any;
+  items: any[];
 }) {
+  if (!items || items.length === 0) return null;
+  
   return (
     <div>
       <h4 className="font-medium text-foreground mb-4 flex items-center gap-2">

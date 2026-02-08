@@ -30,6 +30,8 @@ export interface EnvironmentFormData {
   // Required fields
   roomType: RoomType;
   location: string;
+  latitude?: number;
+  longitude?: number;
   objectives: ObjectiveType[];
   description: string;
   

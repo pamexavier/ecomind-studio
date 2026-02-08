@@ -2,18 +2,18 @@ import { createContext, useContext, useState, ReactNode } from 'react';
 import { UploadedImage, EnvironmentFormData, AnalysisResult } from '@/types/analysis';
 
 interface AnalysisContextType {
-  // State
   images: UploadedImage[];
-  formData: EnvironmentFormData | null;
+  plantaImage: UploadedImage | null; // Novo: Campo específico para a planta
+  formData: EnvironmentFormData; // Removi o null para facilitar o acesso
   result: AnalysisResult | null;
   currentStep: number;
   isProcessing: boolean;
   
-  // Actions
   setImages: (images: UploadedImage[]) => void;
+  setPlantaImage: (image: UploadedImage | null) => void; // Ação para a planta
   addImage: (image: UploadedImage) => void;
   removeImage: (id: string) => void;
-  setFormData: (data: EnvironmentFormData) => void;
+  updateFormData: (data: Partial<EnvironmentFormData>) => void; // Update parcial é melhor
   setResult: (result: AnalysisResult) => void;
   setCurrentStep: (step: number) => void;
   setIsProcessing: (processing: boolean) => void;
@@ -22,16 +22,22 @@ interface AnalysisContextType {
 
 const AnalysisContext = createContext<AnalysisContextType | undefined>(undefined);
 
+// Atualizei o estado inicial com os novos campos técnicos
 const initialFormData: EnvironmentFormData = {
   roomType: 'sala',
   location: '',
   objectives: [],
   description: '',
+  area: '',        // Novo
+  height: '',      // Novo
+  ceilingType: 'laje', // Novo (default seguro)
+  sunPosition: 'tarde', // Novo
 };
 
 export function AnalysisProvider({ children }: { children: ReactNode }) {
   const [images, setImages] = useState<UploadedImage[]>([]);
-  const [formData, setFormData] = useState<EnvironmentFormData | null>(null);
+  const [plantaImage, setPlantaImage] = useState<UploadedImage | null>(null);
+  const [formData, setFormData] = useState<EnvironmentFormData>(initialFormData);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -45,17 +51,22 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
   const removeImage = (id: string) => {
     setImages(prev => {
       const img = prev.find(i => i.id === id);
-      if (img) {
-        URL.revokeObjectURL(img.preview);
-      }
+      if (img) URL.revokeObjectURL(img.preview);
       return prev.filter(i => i.id !== id);
     });
   };
 
+  // Função mais inteligente para atualizar o formulário sem perder dados antigos
+  const updateFormData = (data: Partial<EnvironmentFormData>) => {
+    setFormData(prev => ({ ...prev, ...data }));
+  };
+
   const resetAnalysis = () => {
     images.forEach(img => URL.revokeObjectURL(img.preview));
+    if (plantaImage) URL.revokeObjectURL(plantaImage.preview);
     setImages([]);
-    setFormData(null);
+    setPlantaImage(null);
+    setFormData(initialFormData);
     setResult(null);
     setCurrentStep(0);
     setIsProcessing(false);
@@ -65,14 +76,17 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
     <AnalysisContext.Provider
       value={{
         images,
+        plantaImage,
         formData,
         result,
         currentStep,
         isProcessing,
         setImages,
+        setPlantaImage,
         addImage,
         removeImage,
-        setFormData,
+        updateFormData, // Usando a nova função de update
+        setFormData: updateFormData as any, // Mantendo compatibilidade
         setResult,
         setCurrentStep,
         setIsProcessing,
