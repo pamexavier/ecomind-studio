@@ -53,7 +53,7 @@ export default function Home() {
               <Leaf className="w-5 h-5 text-primary-foreground" />
             </div>
             <span className="font-display text-xl font-semibold text-foreground">
-              EcoMindsX <span className="text-primary">Studio</span>
+              Nexus-X <span className="text-primary">by EcoMindsX</span>
             </span>
           </div>
           <Link to="/analise">
