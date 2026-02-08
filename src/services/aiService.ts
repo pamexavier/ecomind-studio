@@ -59,8 +59,7 @@ export async function generateAnalysis(formData: any, weatherData: any, ambiente
         "lighting": { "naturalLight": [], "artificialLight": { "lampType": "", "colorTemperature": "", "distribution": "" } },
         "thermal": { "passiveStrategies": [], "recommendedMaterials": [], "simpleAdjustments": [], "estimatedTemperatureGain": "" },
         "materials": { "lighting": [], "ventilation": [], "finishes": [], "shading": [] },
-        "disclaimer": "...",
-        "visualPrompt": "..."
+        "disclaimer": "..."
       }
     `;
 

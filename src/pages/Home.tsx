@@ -36,7 +36,6 @@ const features = [
 
 const benefits = [
   'Diagnóstico completo em minutos',
-  'Imagem conceitual do ambiente melhorado',
   'Lista de materiais com estimativas',
   'Linguagem acessível para leigos',
   'Foco em soluções práticas e acessíveis',
@@ -52,9 +51,14 @@ export default function Home() {
             <div className="w-10 h-10 rounded-xl gradient-nature flex items-center justify-center">
               <Leaf className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="font-display text-xl font-semibold text-foreground">
-              Nexus-X <span className="text-primary">by EcoMindsX</span>
-            </span>
+            <div className="flex flex-col leading-tight">
+              <span className="font-display text-xl font-bold text-foreground">
+                Nexus-X
+              </span>
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">
+                by EcoMindsX
+              </span>
+            </div>
           </div>
           <Link to="/analise">
             <Button>Iniciar Análise</Button>
@@ -107,16 +111,25 @@ export default function Home() {
                   </DialogHeader>
                   <div className="grid gap-6 py-4">
                     <div className="flex gap-4">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">1</div>
-                      <p className="text-sm"><span className="font-bold text-foreground">Envie seu Espaço:</span> Faça o upload de fotos ou do seu projeto arquitetônico.</p>
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 font-bold">1</div>
+                      <p className="text-sm">
+                        <span className="font-bold text-foreground">Envie seu Espaço e Localização:</span> 
+                        Insira o endereço do local e faça o upload de fotos ou do projeto. O endereço é fundamental para calcularmos a trajetória solar exata na sua região.
+                      </p>
                     </div>
                     <div className="flex gap-4">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">2</div>
-                      <p className="text-sm"><span className="font-bold text-foreground">Inteligência Nexus-X:</span> Nossa IA identifica materiais e incidência solar baseada em normas NBR.</p>
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 font-bold">2</div>
+                      <p className="text-sm">
+                        <span className="font-bold text-foreground">Inteligência Nexus-X:</span> 
+                        Nossa IA cruza os dados visuais com as coordenadas solares e normas NBR para identificar pontos de calor e iluminação.
+                      </p>
                     </div>
                     <div className="flex gap-4">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">3</div>
-                      <p className="text-sm"><span className="font-bold text-foreground">Relatório Prático:</span> Receba recomendações de otimização térmica e eficiência energética.</p>
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 font-bold">3</div>
+                      <p className="text-sm">
+                        <span className="font-bold text-foreground">Relatório de Otimização:</span> 
+                        Receba recomendações técnicas para melhorar o conforto e reduzir custos de energia sem precisar de reformas complexas.
+                      </p>
                     </div>
                   </div>
                   <Link to="/analise" className="w-full">

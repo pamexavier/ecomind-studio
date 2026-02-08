@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useAnalysis } from '@/contexts/AnalysisContext';
-import VisualSimulation from './VisualSimulation';
+// import VisualSimulation from './VisualSimulation';
 import jsPDF from 'jspdf';
 
 export default function ResultsDisplay() {
@@ -131,11 +131,11 @@ export default function ResultsDisplay() {
 
       {/* Visual Simulation Section */}
       {images.length > 0 && (
-        <VisualSimulation
-          originalImageUrl={images[0].preview}
-          optimizedImageUrl={result.visualSimulation?.optimizedImageUrl}
-          status={result.visualSimulation?.status || 'loading'}
-        />
+          // <VisualSimulation
+          //   originalImageUrl={images[0].preview}
+          //   optimizedImageUrl={result.visualSimulation?.optimizedImageUrl}
+          //   status={result.visualSimulation?.status || 'loading'}
+          // />
       )}
 
       {/* Climate Analysis */}
