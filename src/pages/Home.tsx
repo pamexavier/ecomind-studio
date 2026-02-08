@@ -1,5 +1,13 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Card, CardContent } from '@/components/ui/card';
 import { Sun, Thermometer, Lightbulb, Leaf, ArrowRight, CheckCircle } from 'lucide-react';
 
@@ -84,9 +92,38 @@ export default function Home() {
                   <ArrowRight className="w-4 h-4" />
                 </Button>
               </Link>
-              <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                Como Funciona
-              </Button>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button size="lg" variant="outline" className="w-full sm:w-auto">
+                    Como Funciona
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle className="font-display text-2xl text-primary">Nexus-X: Como Funciona</DialogTitle>
+                    <DialogDescription>
+                      Transformamos dados visuais em conforto ambiental em 3 passos simples.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-6 py-4">
+                    <div className="flex gap-4">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">1</div>
+                      <p className="text-sm"><span className="font-bold text-foreground">Envie seu Espaço:</span> Faça o upload de fotos ou do seu projeto arquitetônico.</p>
+                    </div>
+                    <div className="flex gap-4">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">2</div>
+                      <p className="text-sm"><span className="font-bold text-foreground">Inteligência Nexus-X:</span> Nossa IA identifica materiais e incidência solar baseada em normas NBR.</p>
+                    </div>
+                    <div className="flex gap-4">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">3</div>
+                      <p className="text-sm"><span className="font-bold text-foreground">Relatório Prático:</span> Receba recomendações de otimização térmica e eficiência energética.</p>
+                    </div>
+                  </div>
+                  <Link to="/analise" className="w-full">
+                    <Button className="w-full">Entendi, vamos começar!</Button>
+                  </Link>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
         </div>
