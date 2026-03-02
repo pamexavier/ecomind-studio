@@ -10,12 +10,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useAnalysis } from '@/contexts/AnalysisContext';
-// import VisualSimulation from './VisualSimulation';
+
 import jsPDF from 'jspdf';
 
 export default function ResultsDisplay() {
   const { result, images, resetAnalysis } = useAnalysis();
 
+  // Protege contra resultado indefinido
+  if (!result) return null;
   // Função de Download movida para DENTRO do componente para acessar os dados facilmente
   const handleDownloadPDF = () => {
     if (!result) return;
@@ -33,11 +35,11 @@ export default function ResultsDisplay() {
     doc.setTextColor(255, 255, 255);
     doc.setFont("times", "bold"); // Times traz um ar mais sério/tradicional de engenharia
     doc.setFontSize(22);
-    doc.text("ECOMINDSX", 20, 22);
+    doc.text("Nexus-X", 20, 22);
     
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
-    doc.text("CONSULTORIA EM ALTO DESEMPENHO AMBIENTAL", 20, 28);
+    doc.text("SISTEMA DE INTELIGÊNCIA AMBIENTAL", 20, 28);
 
     // --- CORPO DO RELATÓRIO ---
     doc.setTextColor(cinzaTexto[0], cinzaTexto[1], cinzaTexto[2]);
@@ -87,19 +89,10 @@ export default function ResultsDisplay() {
     doc.text("Este documento contém análise proprietária baseada em inteligência climática.", 20, 285);
     doc.text("Pág 01/01", 185, 285);
 
-    doc.save(`Relatorio_EcomindsX_Premium.pdf`);
+    doc.save(`Relatorio_NexusX_Premium.pdf`);
   };
 
-  if (!result) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-muted-foreground">Nenhum resultado disponível.</p>
-        <Link to="/analise">
-          <Button className="mt-4">Iniciar Nova Análise</Button>
-        </Link>
-      </div>
-    );
-  }
+
 
   return (
     <div className="space-y-8">
@@ -130,13 +123,7 @@ export default function ResultsDisplay() {
       </Card>
 
       {/* Visual Simulation Section */}
-      {images.length > 0 && (
-          // <VisualSimulation
-          //   originalImageUrl={images[0].preview}
-          //   optimizedImageUrl={result.visualSimulation?.optimizedImageUrl}
-          //   status={result.visualSimulation?.status || 'loading'}
-          // />
-      )}
+
 
       {/* Climate Analysis */}
       <Card>
@@ -193,7 +180,7 @@ export default function ResultsDisplay() {
           <div>
             <h4 className="font-medium text-foreground mb-3">Sugestões para Luz Natural</h4>
             <ul className="space-y-2">
-              {result.lighting.naturalLight.map((suggestion: string, i: number) => (
+              {(result.lighting?.naturalLight || []).map((suggestion: string, i: number) => (
                 <li key={i} className="flex items-start gap-2">
                   <CheckCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
                   <span className="text-muted-foreground">{suggestion}</span>
@@ -207,15 +194,15 @@ export default function ResultsDisplay() {
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="p-4 rounded-lg bg-secondary/50">
                 <p className="text-sm text-muted-foreground mb-1">Tipo de Lâmpada</p>
-                <p className="font-medium text-foreground">{result.lighting.artificialLight.lampType}</p>
+                <p className="font-medium text-foreground">{result?.lighting?.artificialLight?.lampType ?? ''}</p>
               </div>
               <div className="p-4 rounded-lg bg-secondary/50">
                 <p className="text-sm text-muted-foreground mb-1">Temperatura de Cor</p>
-                <p className="font-medium text-foreground">{result.lighting.artificialLight.colorTemperature}</p>
+                <p className="font-medium text-foreground">{result?.lighting?.artificialLight?.colorTemperature ?? ''}</p>
               </div>
               <div className="p-4 rounded-lg bg-secondary/50 sm:col-span-1">
                 <p className="text-sm text-muted-foreground mb-1">Distribuição</p>
-                <p className="font-medium text-foreground text-sm">{result.lighting.artificialLight.distribution}</p>
+                <p className="font-medium text-foreground text-sm">{result?.lighting?.artificialLight?.distribution ?? ''}</p>
               </div>
             </div>
           </div>
@@ -337,7 +324,7 @@ export default function ResultsDisplay() {
       <div className="flex flex-col sm:flex-row gap-4 justify-center">
         <PDFDownloadLink 
           document={<EcomindsReport result={result} formData={result.formData || { location: result?.location }} />} 
-          fileName={`EcomindsX_Relatorio_${result.id}.pdf`}
+          fileName={`NexusX_Relatorio_${result.id}.pdf`}
         >
           {({ loading }) => (
             <Button variant="outline" className="gap-2" disabled={loading}>
@@ -373,7 +360,7 @@ function MaterialCategory({
   icon: any;
   items: any[];
 }) {
-  if (!items || items.length === 0) return null;
+  if (!items || !Array.isArray(items) || items.length === 0) return null;
   
   return (
     <div>

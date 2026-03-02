@@ -85,8 +85,8 @@ export const EcomindsReport = ({ result, formData }: any) => (
             src="/ecominds logo sem fundo.png"
             style={styles.logo} 
           />
-          <Text style={styles.brandName}>ECOMINDSX</Text>
-          <Text style={{ fontSize: 8, color: '#2D5A46', marginTop: 2 }}>STUDIO DE INTELIGÊNCIA AMBIENTAL</Text>
+          <Text style={styles.brandName}>Nexus-X</Text>
+          <Text style={{ fontSize: 8, color: '#2D5A46', marginTop: 2 }}>SISTEMA DE INTELIGÊNCIA AMBIENTAL</Text>
         </View>
         <Text style={styles.reportType}>Diagnóstico Executivo</Text>
       </View>

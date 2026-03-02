@@ -44,25 +44,45 @@ export async function generateAnalysis(formData: any, weatherData: any, ambiente
     if (plantaFile) imageParts.push(await fileToGenerativePart(plantaFile));
 
     const prompt = `
-      Aja como Engenheira Sênior da EcomindsX. Missão: Diagnóstico técnico de precisão.
-      
-      DADOS TÉCNICOS:
-      - Local: ${formData.location} | Área: ${formData.area}m² | Teto: ${formData.ceilingType}
-      - Clima: ${weatherData?.temp}°C em Alvorada/POA.
-      
-      TAREFAS: Analise o Ar-condicionado e o forro de ${formData.ceilingType} na foto. Use a planta para orientação solar.
+Você é uma Engenheira Ambiental especialista em conforto térmico e eficiência energética conforme NBR 15220.
 
-      ESTRUTURA OBRIGATÓRIA DO JSON (NÃO PULE NENHUMA CHAVE):
-      {
-        "summary": "...",
-        "climateAnalysis": { "climate": "...", "solarIncidence": "...", "criticalPoints": [] },
-        "lighting": { "naturalLight": [], "artificialLight": { "lampType": "", "colorTemperature": "", "distribution": "" } },
-        "thermal": { "passiveStrategies": [], "recommendedMaterials": [], "simpleAdjustments": [], "estimatedTemperatureGain": "" },
-        "materials": { "lighting": [], "ventilation": [], "finishes": [], "shading": [] },
-        "disclaimer": "..."
-      }
-    `;
+REGRAS OBRIGATÓRIAS:
+- Utilize explicitamente os dados climáticos fornecidos.
+- Classifique a ZONA BIOCLIMÁTICA conforme NBR 15220.
+- Justifique cada recomendação com base no clima e orientação solar.
+- É PROIBIDO gerar sugestões genéricas.
+- Se faltar dado, declare explicitamente qual dado está ausente.
 
+DADOS DO PROJETO:
+Localização: ${formData.location}
+Latitude/Longitude: ${formData.lat}, ${formData.lng}
+Dimensões: ${formData.width}m x ${formData.length}m x ${formData.height}m
+Área estimada: ${formData.width * formData.length} m²
+Descrição do ambiente: ${formData.description}
+Objetivos: ${formData.objectives?.join(', ')}
+
+DADOS CLIMÁTICOS REAIS:
+Temperatura média anual: ${weatherData.avgTemp}°C
+Temperatura máxima média: ${weatherData.maxTemp}°C
+Temperatura mínima média: ${weatherData.minTemp}°C
+Umidade média: ${weatherData.humidity}%
+Direção predominante dos ventos: ${weatherData.windDirection}
+Radiação solar média: ${weatherData.solarRadiation}
+
+INSTRUÇÕES:
+1. Determine a zona bioclimática.
+2. Explique o comportamento térmico esperado.
+3. Identifique riscos reais de sobreaquecimento ou subaquecimento.
+4. Calcule estimativa simplificada de carga térmica considerando área envidraçada estimada de 20% da fachada.
+5. Gere estimativa de redução térmica para cada estratégia proposta.
+6. Estime quantitativo de materiais com base na área.
+
+ESTRUTURA JSON OBRIGATÓRIA:
+{ ... }
+`;
+      
+
+    console.log("Dados que estão indo para a IA:", formData);
     const result = await model.generateContent([prompt, ...imageParts]);
     const text = result.response.text();
     

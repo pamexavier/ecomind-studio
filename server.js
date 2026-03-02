@@ -197,55 +197,83 @@ async function generateWithImagen3(prompt, aspectRatio, res) {
 }
 
 // ✅ ROTA PARA ANÁLISE COM GEMINI (VERTEX AI)
-app.post('/api/analyze', async (req, res) => {
+app.post('/api/analysis', async (req, res) => {
   try {
-    const { prompt } = req.body;
-    
-    if (!prompt) {
-      return res.status(400).json({ error: 'Prompt é obrigatório' });
+    const {
+      location,
+      latitude,
+      longitude,
+      width,
+      length,
+      height,
+      description,
+      objectives
+    } = req.body;
+
+    if (!latitude || !longitude) {
+      return res.status(400).json({ error: 'Latitude e longitude são obrigatórios' });
     }
 
-    const accessToken = await getAccessToken();
-    const geminiUrl = `https://${API_ENDPOINT}/v1/projects/${PROJECT_ID}/locations/${LOCATION}/publishers/google/models/${MODELS.GEMINI_15_FLASH}:generateContent`;
-    
-    console.log(`📝 Analisando com Gemini: "${prompt.substring(0, 50)}..."`);
-    
-    const response = await fetch(geminiUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
+    if (!width || !length || !height) {
+      return res.status(400).json({ error: 'Dimensões são obrigatórias' });
+    }
+
+    // Retorna objeto de análise mockado
+    return res.json({
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString(),
+
+      summary: "Análise preliminar baseada nos dados fornecidos.",
+
+      climate: {
+        climate: "Clima tropical",
+        solarIncidence: "Alta incidência solar na fachada oeste",
+        criticalPoints: [
+          "Exposição excessiva ao sol da tarde",
+          "Possível ganho térmico elevado"
+        ]
       },
-      body: JSON.stringify({
-        contents: [{
-          role: "user",
-          parts: [{ text: prompt }]
-        }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 2048,
+
+      lighting: {
+        naturalLight: [
+          "Ampliar aberturas voltadas ao norte",
+          "Utilizar claraboias com controle térmico"
+        ],
+        artificialLight: {
+          lampType: "LED",
+          colorTemperature: "4000K",
+          distribution: "Distribuição linear com spots direcionais"
         }
-      }),
+      },
+
+      thermal: {
+        passiveStrategies: [
+          "Ventilação cruzada",
+          "Brises na fachada oeste"
+        ],
+        recommendedMaterials: [
+          "Telha termoacústica",
+          "Vidro duplo com controle solar"
+        ],
+        simpleAdjustments: [
+          "Uso de cortinas térmicas",
+          "Pintura clara nas paredes externas"
+        ]
+      },
+
+      materials: {
+        lighting: [],
+        ventilation: [],
+        finishes: [],
+        shading: []
+      },
+
+      disclaimer: "Análise conceitual. Recomenda-se validação técnica especializada."
     });
 
-    const data = await response.json();
-    
-    if (!response.ok) {
-      console.error("❌ Erro Gemini:", data);
-      return res.status(response.status).json(data);
-    }
-
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-    
-    res.json({
-      success: true,
-      analysis: text,
-      model: MODELS.GEMINI_15_FLASH,
-    });
-    
   } catch (error) {
-    console.error("🔥 Erro na análise:", error);
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Erro interno' });
   }
 });
 

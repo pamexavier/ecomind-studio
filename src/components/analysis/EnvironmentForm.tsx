@@ -53,7 +53,7 @@ export default function EnvironmentForm() {
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  const { register, handleSubmit, setValue, formState: { errors } } = useForm<FormValues>({
+  const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: { objectives: [] }
   });
@@ -117,7 +117,7 @@ export default function EnvironmentForm() {
               key={room.value}
               type="button"
               onClick={() => setValue('roomType', room.value)}
-              className="flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all hover:border-primary/50 focus:border-primary bg-card"
+              className={`flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all hover:border-primary/50 focus:border-primary bg-card ${watch('roomType') === room.value ? 'borda-preta-ativa' : ''}`}
             >
               <room.icon className="w-6 h-6 text-primary" />
               <span className="text-sm font-medium">{room.label}</span>
