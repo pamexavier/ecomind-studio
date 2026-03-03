@@ -66,7 +66,7 @@ export interface AnalysisResult {
     passiveStrategies: string[];
     recommendedMaterials: string[];
     simpleAdjustments: string[];
-    loadEstimate: string; // Novo
+    loadEstimateWatts: string; // Novo
   };
   materials: {
     lighting: MaterialItem[];
