@@ -3,17 +3,17 @@ import { UploadedImage, EnvironmentFormData, AnalysisResult } from '@/types/anal
 
 interface AnalysisContextType {
   images: UploadedImage[];
-  plantaImage: UploadedImage | null; // Novo: Campo específico para a planta
-  formData: EnvironmentFormData; // Removi o null para facilitar o acesso
+  plantaImage: UploadedImage | null;
+  formData: EnvironmentFormData;
   result: AnalysisResult | null;
   currentStep: number;
   isProcessing: boolean;
   
   setImages: (images: UploadedImage[]) => void;
-  setPlantaImage: (image: UploadedImage | null) => void; // Ação para a planta
+  setPlantaImage: (image: UploadedImage | null) => void;
   addImage: (image: UploadedImage) => void;
   removeImage: (id: string) => void;
-  updateFormData: (data: Partial<EnvironmentFormData>) => void; // Update parcial é melhor
+  updateFormData: (data: Partial<EnvironmentFormData>) => void;
   setResult: (result: AnalysisResult) => void;
   setCurrentStep: (step: number) => void;
   setIsProcessing: (processing: boolean) => void;
@@ -22,16 +22,15 @@ interface AnalysisContextType {
 
 const AnalysisContext = createContext<AnalysisContextType | undefined>(undefined);
 
-// Atualizei o estado inicial com os novos campos técnicos
 const initialFormData: EnvironmentFormData = {
   roomType: 'sala',
   location: '',
   objectives: [],
   description: '',
-  area: '',        // Novo
-  height: '',      // Novo
-  ceilingType: 'laje', // Novo (default seguro)
-  sunPosition: 'tarde', // Novo
+  area: '',
+  height: '',
+  ceilingType: 'laje',
+  sunPosition: 'tarde',
 };
 
 export function AnalysisProvider({ children }: { children: ReactNode }) {
@@ -56,7 +55,6 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  // Função mais inteligente para atualizar o formulário sem perder dados antigos
   const updateFormData = (data: Partial<EnvironmentFormData>) => {
     setFormData(prev => ({ ...prev, ...data }));
   };
@@ -85,8 +83,7 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
         setPlantaImage,
         addImage,
         removeImage,
-        updateFormData, // Usando a nova função de update
-        setFormData: updateFormData as any, // Mantendo compatibilidade
+        updateFormData,
         setResult,
         setCurrentStep,
         setIsProcessing,

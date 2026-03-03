@@ -1,98 +1,212 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { EnvironmentFormData, AnalysisResult } from "@/types/analysis";
 
-const MODEL_NAME = "gemini-flash-latest"; // Usando o modelo mais estável recomendado
+const MODEL_NAME = "gemini-2.0-flash";
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+
+if (!API_KEY) {
+  throw new Error("VITE_GEMINI_API_KEY não configurada.");
+}
+
 const genAI = new GoogleGenerativeAI(API_KEY);
 
-// Função para listar os modelos disponíveis na sua chave Google
-export async function listAvailableModels() {
-  try {
-    // Busca a lista de modelos disponíveis para a sua chave
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`);
-    const data = await response.json();
-    console.log("🔍 MODELOS DISPONÍVEIS NA SUA CHAVE:");
-    data.models.forEach((m: any) => {
-      console.log(`Nome: ${m.name} | Suporta: ${m.supportedGenerationMethods}`);
-    });
-  } catch (error) {
-    console.error("Erro ao listar modelos:", error);
-  }
+/* =========================================================
+   BASE DE CONHECIMENTO — NBR 15220:2023
+========================================================= */
+
+const BASE_CONHECIMENTO_ZONAS: Record<string, string> = {
+  "1": "Zona 1: Ênfase em isolamento térmico e ganho solar no inverno.",
+  "2": "Zona 2: Isolamento no inverno e ventilação no verão.",
+  "3": "Zona 3: Necessita massa térmica e ventilação cruzada.",
+  "4": "Zona 4: Resfriamento evaporativo e ventilação intensa.",
+  "5": "Zona 5: Alta inércia térmica e ventilação seletiva.",
+  "6": "Zona 6: Ventilação constante, sombreamento rigoroso e baixa inércia térmica."
+};
+
+function buscarDiretrizPorCidade(localizacao: string): string {
+  const loc = localizacao.toLowerCase();
+
+  if (loc.includes("araguaina") || loc.includes("tocantins"))
+    return BASE_CONHECIMENTO_ZONAS["6"];
+
+  if (loc.includes("porto alegre") || loc.includes("rio grande do sul"))
+    return BASE_CONHECIMENTO_ZONAS["1"];
+
+  if (loc.includes("acre"))
+    return BASE_CONHECIMENTO_ZONAS["6"];
+
+  return "Zona não identificada automaticamente. Exigir verificação conforme NBR 15220:2023.";
 }
 
-// Chama a função assim que o módulo for carregado
-listAvailableModels();
+/* =========================================================
+   UTIL — CONVERTER ARQUIVO PARA BASE64
+========================================================= */
 
-// Função auxiliar para converter arquivo em parte compreensível pela IA
 async function fileToGenerativePart(file: File) {
-  const base64Data = await new Promise((resolve) => {
+  const base64Data = await new Promise<string>((resolve) => {
     const reader = new FileReader();
-    reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+    reader.onloadend = () =>
+      resolve((reader.result as string).split(",")[1]);
     reader.readAsDataURL(file);
   });
-  return { inlineData: { data: base64Data, mimeType: file.type } };
+
+  return {
+    inlineData: {
+      data: base64Data,
+      mimeType: file.type
+    }
+  };
 }
 
-export async function generateAnalysis(formData: any, weatherData: any, ambienteFile?: File, plantaFile?: File) {
+/* =========================================================
+   FUNÇÃO PRINCIPAL
+========================================================= */
+
+export async function generateAnalysis(
+  formData: EnvironmentFormData,
+  weatherData: any,
+  ambienteFiles: File[],
+  plantaFile?: File
+): Promise<AnalysisResult> {
+
+  const diretrizEspecifica = buscarDiretrizPorCidade(formData.location);
+
+  const volume = Number(formData.area) * Number(formData.height);
+  const deltaT = Math.max((weatherData?.temp || 30) - 24, 5); // ΔT mínimo 5°C
+  const area = Number(formData.area);
+
+  /* =========================================================
+     PROMPT RÍGIDO
+  ========================================================= */
+
+  const prompt = `
+SISTEMA DE AUDITORIA TÉRMICA — MODO RIGOROSO
+
+Você é Engenheira Ambiental e Auditora Técnica especialista em NBR 15220:2023.
+
+⚠️ REGRAS ABSOLUTAS:
+- Responder exclusivamente em Português (Brasil).
+- Não escrever nada fora do JSON.
+- Não usar inglês no corpo da análise.
+- Não gerar texto explicativo fora da estrutura.
+- Utilizar termos: Transmitância Térmica (U), Capacidade Térmica (C), SRI.
+- Apresentar cálculo simplificado da carga térmica.
+
+━━━━━━━━━━━━━━━━━━━━━━━
+DIRETRIZ NBR 15220 (OBRIGATÓRIA):
+${diretrizEspecifica}
+━━━━━━━━━━━━━━━━━━━━━━━
+
+DADOS:
+Local: ${formData.location}
+Área: ${area} m²
+Pé-direito: ${formData.height} m
+Volume: ${volume} m³
+Cobertura: ${formData.ceilingType}
+Exposição Solar: ${formData.sunPosition}
+Temperatura externa: ${weatherData?.temp} °C
+Umidade: ${weatherData?.humidade} %
+ΔT considerado: ${deltaT} °C
+
+━━━━━━━━━━━━━━━━━━━━━━━
+CÁLCULO OBRIGATÓRIO:
+
+Estimativa simplificada:
+Q = U x A x ΔT
+
+Considere:
+U médio = 2,5 W/m²K (se não houver dado)
+Área equivalente de troca = 1,2 x área
+ΔT = ${deltaT}
+
+Calcular carga térmica estimada em Watts.
+
+Se pé-direito < 2.40m → classificar como ERRO CRÍTICO.
+
+━━━━━━━━━━━━━━━━━━━━━━━
+RESPONDER APENAS EM JSON:
+
+{
+  "summary": "",
+  "climate": {
+    "classification": "",
+    "bioclimaticZone": "",
+    "solarIncidence": "",
+    "criticalPoints": []
+  },
+  "thermal": {
+    "loadEstimateWatts": "",
+    "calculationMemory": "",
+    "passiveStrategies": [],
+    "recommendedMaterials": []
+  },
+  "materials": {
+    "lighting": [],
+    "ventilation": [],
+    "finishes": [],
+    "shading": []
+  },
+  "nonCompliance": [],
+  "visualPrompt": "Detailed architectural render prompt in English"
+}
+
+VALIDAR JSON antes de finalizar.
+`;
+
   try {
-    const model = genAI.getGenerativeModel({ 
+    const model = genAI.getGenerativeModel({
       model: MODEL_NAME,
-      generationConfig: { responseMimeType: "application/json" } // Força o Google a responder JSON puro
+      generationConfig: {
+        temperature: 0.1,
+        topP: 0.1,
+        topK: 1,
+        responseMimeType: "application/json"
+      }
     });
 
-    const imageParts = [];
-    if (ambienteFile) imageParts.push(await fileToGenerativePart(ambienteFile));
-    if (plantaFile) imageParts.push(await fileToGenerativePart(plantaFile));
+    const imageParts: any[] = [];
 
-    const prompt = `
-Você é uma Engenheira Ambiental especialista em conforto térmico e eficiência energética conforme NBR 15220.
+    if (ambienteFiles?.length > 0) {
+      const converted = await Promise.all(
+        ambienteFiles.map(fileToGenerativePart)
+      );
+      imageParts.push(...converted);
+    }
 
-REGRAS OBRIGATÓRIAS:
-- Utilize explicitamente os dados climáticos fornecidos.
-- Classifique a ZONA BIOCLIMÁTICA conforme NBR 15220.
-- Justifique cada recomendação com base no clima e orientação solar.
-- É PROIBIDO gerar sugestões genéricas.
-- Se faltar dado, declare explicitamente qual dado está ausente.
+    if (plantaFile) {
+      imageParts.push(await fileToGenerativePart(plantaFile));
+    }
 
-DADOS DO PROJETO:
-Localização: ${formData.location}
-Latitude/Longitude: ${formData.lat}, ${formData.lng}
-Dimensões: ${formData.width}m x ${formData.length}m x ${formData.height}m
-Área estimada: ${formData.width * formData.length} m²
-Descrição do ambiente: ${formData.description}
-Objetivos: ${formData.objectives?.join(', ')}
-
-DADOS CLIMÁTICOS REAIS:
-Temperatura média anual: ${weatherData.avgTemp}°C
-Temperatura máxima média: ${weatherData.maxTemp}°C
-Temperatura mínima média: ${weatherData.minTemp}°C
-Umidade média: ${weatherData.humidity}%
-Direção predominante dos ventos: ${weatherData.windDirection}
-Radiação solar média: ${weatherData.solarRadiation}
-
-INSTRUÇÕES:
-1. Determine a zona bioclimática.
-2. Explique o comportamento térmico esperado.
-3. Identifique riscos reais de sobreaquecimento ou subaquecimento.
-4. Calcule estimativa simplificada de carga térmica considerando área envidraçada estimada de 20% da fachada.
-5. Gere estimativa de redução térmica para cada estratégia proposta.
-6. Estime quantitativo de materiais com base na área.
-
-ESTRUTURA JSON OBRIGATÓRIA:
-{ ... }
-`;
-      
-
-    console.log("Dados que estão indo para a IA:", formData);
     const result = await model.generateContent([prompt, ...imageParts]);
-    const text = result.response.text();
-    
-    // Limpeza de segurança para garantir que o JSON seja lido corretamente
-    const startIndex = text.indexOf('{');
-    const endIndex = text.lastIndexOf('}') + 1;
-    return JSON.parse(text.substring(startIndex, endIndex));
+    const response = await result.response;
+    const text = response.text().trim();
+
+    if (!text.startsWith("{")) {
+      throw new Error("Resposta não retornou JSON válido.");
+    }
+
+    const parsed = JSON.parse(text);
+
+    return {
+      id: `analysis-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      ...parsed,
+      disclaimer: "Análise técnica baseada na NBR 15220:2023."
+    };
 
   } catch (error: any) {
-    console.error("Erro na Engenharia da IA:", error);
-    throw error;
+    console.error("Erro no aiService:", error);
+
+    return {
+      id: `analysis-error-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      summary: "Falha na geração da análise técnica.",
+      climate: {} as any,
+      thermal: {} as any,
+      materials: {} as any,
+      nonCompliance: [],
+      visualPrompt: "",
+      disclaimer: "Erro técnico ao processar análise."
+    };
   }
 }

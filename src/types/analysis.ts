@@ -1,5 +1,3 @@
-// Tipos para o sistema EcoMindsX Studio
-
 export type RoomType = 
   | 'sala' 
   | 'quarto' 
@@ -18,26 +16,18 @@ export type ObjectiveType =
 
 export type BudgetLevel = 'baixo' | 'medio' | 'alto';
 
-export type WindowPosition = 'frente' | 'lateral' | 'fundos' | 'nenhuma';
-
-export interface EnvironmentDimensions {
-  width?: number;
-  length?: number;
-  height?: number;
-}
-
+// Atualizado para refletir o formulário real
 export interface EnvironmentFormData {
-  // Required fields
   roomType: RoomType;
   location: string;
   latitude?: number;
   longitude?: number;
   objectives: ObjectiveType[];
   description: string;
-  
-  // Optional fields
-  dimensions?: EnvironmentDimensions;
-  windowPosition?: WindowPosition;
+  area: string;          // Novo
+  height: string;        // Novo
+  ceilingType: string;   // Novo
+  sunPosition: string;   // Novo
   budget?: BudgetLevel;
 }
 
@@ -49,29 +39,43 @@ export interface UploadedImage {
 
 export interface AnalysisRequest {
   images: UploadedImage[];
+  plantaImage: UploadedImage | null; // Adicionado para suportar a planta separada
   formData: EnvironmentFormData;
 }
 
-// Resultado da análise
-export interface ClimateAnalysis {
-  climate: string;
-  solarIncidence: string;
-  criticalPoints: string[];
-}
-
-export interface LightingAnalysis {
-  naturalLight: string[];
-  artificialLight: {
-    lampType: string;
-    colorTemperature: string;
-    distribution: string;
+// Estrutura de resposta que a IA DEVE seguir
+export interface AnalysisResult {
+  id: string;
+  createdAt: string;
+  summary: string;
+  climate: {
+    climate: string;
+    solarIncidence: string;
+    criticalPoints: string[];
+    bioclimaticZone: string; // Novo campo NBR 15220
   };
-}
-
-export interface ThermalAnalysis {
-  passiveStrategies: string[];
-  recommendedMaterials: string[];
-  simpleAdjustments: string[];
+  lighting: {
+    naturalLight: string[];
+    artificialLight: {
+      lampType: string;
+      colorTemperature: string;
+      distribution: string;
+    };
+  };
+  thermal: {
+    passiveStrategies: string[];
+    recommendedMaterials: string[];
+    simpleAdjustments: string[];
+    loadEstimate: string; // Novo
+  };
+  materials: {
+    lighting: MaterialItem[];
+    ventilation: MaterialItem[];
+    finishes: MaterialItem[];
+    shading: MaterialItem[];
+  };
+  visualPrompt?: string; // Para a simulação visual
+  disclaimer: string;
 }
 
 export interface MaterialItem {
@@ -79,32 +83,4 @@ export interface MaterialItem {
   description: string;
   purpose: string;
   estimatedQuantity?: string;
-}
-
-export interface MaterialsList {
-  lighting: MaterialItem[];
-  ventilation: MaterialItem[];
-  finishes: MaterialItem[];
-  shading: MaterialItem[];
-}
-
-export type SimulationStatus = 'loading' | 'ready' | 'error';
-
-export interface VisualSimulation {
-  originalImageUrl: string;
-  optimizedImageUrl?: string;
-  status: SimulationStatus;
-}
-
-export interface AnalysisResult {
-  id: string;
-  createdAt: string;
-  summary: string;
-  climate: ClimateAnalysis;
-  lighting: LightingAnalysis;
-  thermal: ThermalAnalysis;
-  materials: MaterialsList;
-  conceptualImageUrl?: string;
-  visualSimulation?: VisualSimulation;
-  disclaimer: string;
 }

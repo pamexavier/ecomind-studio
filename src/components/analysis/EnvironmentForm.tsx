@@ -2,7 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ArrowLeft, ArrowRight, Home, Building2, Utensils, Bed, Monitor, Bath, Sun, Thermometer, Palette, Leaf, Flame, Loader2 } from 'lucide-react';
+import { 
+  ArrowLeft, ArrowRight, Home, Building2, Utensils, Bed, 
+  Monitor, Bath, Sun, Thermometer, Palette, Leaf, 
+  Flame, Loader2, Ruler, Home as HouseIcon 
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAnalysis } from '@/contexts/AnalysisContext';
 import { RoomType, ObjectiveType, EnvironmentFormData } from '@/types/analysis';
 
+// Schema de validação técnica
 const formSchema = z.object({
   roomType: z.string().min(1, 'Selecione o tipo de ambiente'),
   location: z.string().min(3, 'Informe a localização'),
@@ -18,11 +23,10 @@ const formSchema = z.object({
   longitude: z.number().optional(),
   objectives: z.array(z.string()).min(1, 'Selecione pelo menos um objetivo'),
   description: z.string().min(10, 'Descreva o ambiente com mais detalhes'),
-  width: z.string().optional(),
-  length: z.string().optional(),
-  height: z.string().optional(),
-  windowPosition: z.string().optional(),
-  budget: z.string().optional(),
+  area: z.string().min(1, 'Informe a área (m²)'),
+  height: z.string().min(1, 'Informe o pé-direito (m)'),
+  sunPosition: z.string().default('tarde'),
+  ceilingType: z.string().default('laje'),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -36,7 +40,7 @@ const roomTypes: { value: RoomType; label: string; icon: any }[] = [
   { value: 'varanda', label: 'Varanda', icon: Building2 },
 ];
 
-const objectives: { value: ObjectiveType; label: string; icon: any }[] = [
+const objectivesList = [
   { value: 'iluminacao_natural', label: 'Mais iluminação natural', icon: Sun },
   { value: 'menos_calor', label: 'Menos calor', icon: Flame },
   { value: 'conforto_termico', label: 'Mais conforto térmico', icon: Thermometer },
@@ -45,8 +49,7 @@ const objectives: { value: ObjectiveType; label: string; icon: any }[] = [
 ];
 
 export default function EnvironmentForm() {
-  const { setFormData, setCurrentStep } = useAnalysis();
-  const [selectedObjectives, setSelectedObjectives] = useState<ObjectiveType[]>([]);
+  const { formData, updateFormData, setCurrentStep } = useAnalysis();
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -55,8 +58,13 @@ export default function EnvironmentForm() {
 
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { objectives: [] }
+    defaultValues: {
+      ...formData,
+      objectives: formData.objectives || [],
+    }
   });
+
+  const selectedObjectives = watch('objectives') || [];
 
   const handleSearchAddress = (query: string) => {
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
@@ -83,31 +91,26 @@ export default function EnvironmentForm() {
     }, 500);
   };
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node)) {
-        setShowSuggestions(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const toggleObjective = (value: ObjectiveType) => {
-    const newObjectives = selectedObjectives.includes(value)
-      ? selectedObjectives.filter((o) => o !== value)
-      : [...selectedObjectives, value];
-    setSelectedObjectives(newObjectives);
-    setValue('objectives', newObjectives);
+  const toggleObjective = (value: string) => {
+    const current = selectedObjectives;
+    const updated = current.includes(value)
+      ? current.filter((o) => o !== value)
+      : [...current, value];
+    setValue('objectives', updated);
   };
 
   const onSubmit = (data: FormValues) => {
-    setFormData(data as EnvironmentFormData);
+    updateFormData(data as Partial<EnvironmentFormData>);
     setCurrentStep(2);
   };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="text-center space-y-2">
+        <h2 className="text-3xl font-display font-bold text-foreground">Dados do Ambiente</h2>
+        <p className="text-muted-foreground">Insira as medidas e localização para uma análise bioclimática precisa.</p>
+      </div>
+
       {/* Tipo de Ambiente */}
       <div className="space-y-4">
         <Label className="text-foreground font-medium text-lg">Qual o ambiente?</Label>
@@ -117,98 +120,137 @@ export default function EnvironmentForm() {
               key={room.value}
               type="button"
               onClick={() => setValue('roomType', room.value)}
-              className={`flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all hover:border-primary/50 focus:border-primary bg-card ${watch('roomType') === room.value ? 'borda-preta-ativa' : ''}`}
+              className={`flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all hover:border-primary/50 bg-card ${watch('roomType') === room.value ? 'border-primary bg-primary/5' : 'border-border'}`}
             >
               <room.icon className="w-6 h-6 text-primary" />
               <span className="text-sm font-medium">{room.label}</span>
             </button>
           ))}
         </div>
-        {errors.roomType && <p className="text-sm text-destructive">{errors.roomType.message}</p>}
       </div>
 
-      {/* Localização com Busca Inteligente */}
-      <div className="space-y-2 relative" ref={suggestionsRef}>
-        <Label htmlFor="location" className="text-foreground font-medium">
-          Endereço Completo ou Localização *
-        </Label>
-        <div className="relative">
-          <Input
-            id="location"
-            placeholder="Digite seu endereço (Rua, Número, Cidade)..."
-            {...register('location')}
-            autoComplete="off"
-            onChange={(e) => {
-              register('location').onChange(e);
-              handleSearchAddress(e.target.value);
-            }}
-            className="bg-background pr-10"
-          />
-          {isSearching && <Loader2 className="absolute right-3 top-3 w-4 h-4 animate-spin text-muted-foreground" />}
-        </div>
-        
-        {showSuggestions && suggestions.length > 0 && (
-          <div className="absolute z-[100] w-full bg-card border border-border rounded-xl mt-1 shadow-2xl max-h-[200px] overflow-y-auto">
-            {suggestions.map((item) => (
-              <button
-                key={item.place_id}
-                type="button"
-                className="w-full text-left px-4 py-3 hover:bg-primary/10 text-sm border-b last:border-0 border-border transition-colors"
-                onClick={() => {
-                  setValue('location', item.display_name);
-                  setValue('latitude', parseFloat(item.lat));
-                  setValue('longitude', parseFloat(item.lon));
-                  setShowSuggestions(false);
-                }}
-              >
-                <span className="font-medium block truncate">{item.display_name}</span>
-              </button>
-            ))}
+      {/* Localização e Medidas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-2 relative" ref={suggestionsRef}>
+          <Label htmlFor="location">Localização (Cidade/UF) *</Label>
+          <div className="relative">
+            <Input
+              id="location"
+              placeholder="Ex: Araguaína, TO"
+              {...register('location')}
+              onChange={(e) => {
+                register('location').onChange(e);
+                handleSearchAddress(e.target.value);
+              }}
+              autoComplete="off"
+              className="bg-background"
+            />
+            {isSearching && <Loader2 className="absolute right-3 top-3 w-4 h-4 animate-spin text-muted-foreground" />}
           </div>
-        )}
-        {errors.location && <p className="text-sm text-destructive">{errors.location.message}</p>}
+          {showSuggestions && (
+            <div className="absolute z-50 w-full bg-card border rounded-md mt-1 shadow-lg max-h-40 overflow-y-auto">
+              {suggestions.map((item) => (
+                <button
+                  key={item.place_id}
+                  type="button"
+                  className="w-full text-left px-4 py-2 hover:bg-accent text-sm border-b last:border-0"
+                  onClick={() => {
+                    setValue('location', item.display_name);
+                    setValue('latitude', parseFloat(item.lat));
+                    setValue('longitude', parseFloat(item.lon));
+                    setShowSuggestions(false);
+                  }}
+                >
+                  {item.display_name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-xl border">
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
+              <Ruler className="w-3 h-3"/> Área (m²)
+            </Label>
+            <Input type="number" step="0.1" {...register('area')} placeholder="Ex: 20" className="bg-background" />
+          </div>
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
+              <Ruler className="w-3 h-3"/> Pé-direito (m)
+            </Label>
+            <Input type="number" step="0.1" {...register('height')} placeholder="Ex: 2.7" className="bg-background" />
+          </div>
+        </div>
+      </div>
+
+      {/* Sol e Cobertura */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2"><Sun className="w-4 h-4 text-orange-500"/> Sol Crítico</Label>
+          <Select value={watch('sunPosition')} onValueChange={(v) => setValue('sunPosition', v)}>
+            <SelectTrigger className="bg-background"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="manha">Manhã (Leste)</SelectItem>
+              <SelectItem value="tarde">Tarde (Oeste - Mais quente)</SelectItem>
+              <SelectItem value="dia_todo">Dia todo (Norte)</SelectItem>
+              <SelectItem value="pouca">Pouca incidência (Sul)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2"><HouseIcon className="w-4 h-4 text-blue-500"/> Cobertura</Label>
+          <Select value={watch('ceilingType')} onValueChange={(v) => setValue('ceilingType', v)}>
+            <SelectTrigger className="bg-background"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="laje">Laje de Concreto</SelectItem>
+              <SelectItem value="telhado_ceramico">Telhado Cerâmico</SelectItem>
+              <SelectItem value="fibrocimento">Fibrocimento (Eternit)</SelectItem>
+              <SelectItem value="metalico">Telhado Metálico</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Objetivos */}
       <div className="space-y-3">
         <Label className="text-foreground font-medium">Objetivos principais *</Label>
-        <div className="flex flex-wrap gap-3">
-          {objectives.map((obj) => (
+        <div className="flex flex-wrap gap-2">
+          {objectivesList.map((obj) => (
             <button
               key={obj.value}
               type="button"
               onClick={() => toggleObjective(obj.value)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full border-2 transition-all ${
-                selectedObjectives.includes(obj.value) ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background'
+              className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                selectedObjectives.includes(obj.value) 
+                ? 'bg-primary text-primary-foreground border-primary shadow-md' 
+                : 'bg-background hover:border-primary/50 text-muted-foreground'
               }`}
             >
-              <obj.icon className="w-4 h-4" />
-              <span className="text-sm font-medium">{obj.label}</span>
+              <span className="flex items-center gap-2">
+                <obj.icon className="w-3 h-3" /> {obj.label}
+              </span>
             </button>
           ))}
         </div>
-        {errors.objectives && <p className="text-sm text-destructive">{errors.objectives.message}</p>}
       </div>
 
-      {/* Descrição */}
       <div className="space-y-2">
-        <Label htmlFor="description">Descrição das necessidades *</Label>
-        <Textarea
-          id="description"
-          placeholder="Ex: Sala com sol da tarde muito forte. Gostaria de opções de vidros ou películas..."
-          {...register('description')}
-          className="min-h-[120px]"
+        <Label htmlFor="description">Descrição das necessidades</Label>
+        <Textarea 
+          id="description" 
+          {...register('description')} 
+          placeholder="Ex: Ambiente abafado, pouca circulação de ar..."
+          className="min-h-[100px] bg-background" 
         />
-        {errors.description && <p className="text-sm text-destructive">{errors.description.message}</p>}
       </div>
 
-      {/* Navegação */}
       <div className="flex justify-between pt-4">
-        <Button type="button" variant="outline" onClick={() => setCurrentStep(0)} className="gap-2">
+        <Button type="button" variant="ghost" onClick={() => setCurrentStep(0)} className="gap-2">
           <ArrowLeft className="w-4 h-4" /> Voltar
         </Button>
-        <Button type="submit" className="gap-2">
-          Iniciar Análise <ArrowRight className="w-4 h-4" />
+        <Button type="submit" className="gap-2 px-8">
+          Iniciar Análise Profissional <ArrowRight className="w-4 h-4" />
         </Button>
       </div>
     </form>
