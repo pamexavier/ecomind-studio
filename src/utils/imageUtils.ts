@@ -1,5 +1,5 @@
 /**
- * Redimensiona a imagem para otimizar tokens e velocidade.
+ * Redimensiona a imagem para otimizar tokens e velocidade da IA.
  */
 export async function resizeImage(file: File, maxWidth = 1024): Promise<Blob> {
   return new Promise((resolve, reject) => {
@@ -14,6 +14,7 @@ export async function resizeImage(file: File, maxWidth = 1024): Promise<Blob> {
         let width = img.width;
         let height = img.height;
 
+        // Mantém a proporção original, limitando a largura máxima
         if (width > maxWidth) {
           height = (maxWidth / width) * height;
           width = maxWidth;
@@ -29,6 +30,7 @@ export async function resizeImage(file: File, maxWidth = 1024): Promise<Blob> {
           ctx.drawImage(img, 0, 0, width, height);
         }
 
+        // Converte para JPEG com 80% de qualidade (Equilíbrio perfeito entre peso e nitidez)
         canvas.toBlob(
           (blob) => blob ? resolve(blob) : reject(new Error("Erro ao processar imagem")),
           "image/jpeg",
@@ -40,7 +42,7 @@ export async function resizeImage(file: File, maxWidth = 1024): Promise<Blob> {
 }
 
 /**
- * Converte para o formato que a IA entende.
+ * Converte o Blob para o formato inlineData que o Gemini exige.
  */
 export async function fileToGenerativePart(blob: Blob) {
   const base64Data = await new Promise<string>((resolve) => {

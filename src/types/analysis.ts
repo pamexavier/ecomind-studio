@@ -1,58 +1,37 @@
-export type RoomType = 
-  | 'sala' 
-  | 'quarto' 
-  | 'escritorio' 
-  | 'cozinha' 
-  | 'banheiro' 
-  | 'varanda' 
-  | 'outro';
+export type RoomType = 'residencia' | 'academia' | 'comercio' | 'escritorio' | 'outro';
+export type InterventionType = 'construcao' | 'retrofit';
 
-export type ObjectiveType = 
-  | 'iluminacao_natural' 
-  | 'menos_calor' 
-  | 'conforto_termico' 
-  | 'estetica' 
-  | 'sustentabilidade';
+export interface MaterialItem {
+  name: string;
+  description: string;
+  purpose: string;
+  estimatedQuantity?: string;
+}
 
-export type BudgetLevel = 'baixo' | 'medio' | 'alto';
-
-// Atualizado para refletir o formulário real
 export interface EnvironmentFormData {
   roomType: RoomType;
+  interventionType: InterventionType;
   location: string;
-  latitude?: number;
-  longitude?: number;
-  objectives: ObjectiveType[];
-  description: string;
-  area: string;          // Novo
-  height: string;        // Novo
-  ceilingType: string;   // Novo
-  sunPosition: string;   // Novo
-  budget?: BudgetLevel;
+  description: string; // Aqui o usuário descreve o entorno (arborizado, centro urbano, etc)
+  area: string;
+  height: string;
+  ceilingType: string;
+  sunPosition: string;
+  objectives: string[];
 }
 
-export interface UploadedImage {
-  id: string;
-  file: File;
-  preview: string;
-}
-
-export interface AnalysisRequest {
-  images: UploadedImage[];
-  plantaImage: UploadedImage | null; // Adicionado para suportar a planta separada
-  formData: EnvironmentFormData;
-}
-
-// Estrutura de resposta que a IA DEVE seguir
 export interface AnalysisResult {
   id: string;
   createdAt: string;
   summary: string;
+  expertObservation?: string; // Seu campo de revisão manual
+  isCertified: boolean;       // Selo de revisão da Pamella
+  formData?: EnvironmentFormData;
   climate: {
     climate: string;
     solarIncidence: string;
     criticalPoints: string[];
-    bioclimaticZone: string; // Novo campo NBR 15220
+    bioclimaticZone: string;
   };
   lighting: {
     naturalLight: string[];
@@ -66,7 +45,8 @@ export interface AnalysisResult {
     passiveStrategies: string[];
     recommendedMaterials: string[];
     simpleAdjustments: string[];
-    loadEstimateWatts: string; // Novo
+    loadEstimate: string;
+    maintenanceAlerts?: string[]; // Novos alertas (limpeza, fezes de aves, etc)
   };
   materials: {
     lighting: MaterialItem[];
@@ -74,13 +54,6 @@ export interface AnalysisResult {
     finishes: MaterialItem[];
     shading: MaterialItem[];
   };
-  visualPrompt?: string; // Para a simulação visual
   disclaimer: string;
-}
-
-export interface MaterialItem {
-  name: string;
-  description: string;
-  purpose: string;
-  estimatedQuantity?: string;
+  visualPrompt?: string;
 }

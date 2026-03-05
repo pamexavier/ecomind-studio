@@ -1,258 +1,322 @@
-import { useState, useEffect, useRef } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-  ArrowLeft, ArrowRight, Home, Building2, Utensils, Bed, 
-  Monitor, Bath, Sun, Thermometer, Palette, Leaf, 
-  Flame, Loader2, Ruler, Home as HouseIcon 
+  Building2, Home, Dumbbell, Briefcase, Construction, 
+  RefreshCw, MapPin, Maximize, ArrowRight, Upload, FileText, 
+  Sun, Ruler, Waves, Sparkles, Leaf
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useAnalysis } from '@/contexts/AnalysisContext';
-import { RoomType, ObjectiveType, EnvironmentFormData } from '@/types/analysis';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { EnvironmentFormData, RoomType, InterventionType } from '@/types/analysis';
 
-// Schema de validação técnica
-const formSchema = z.object({
-  roomType: z.string().min(1, 'Selecione o tipo de ambiente'),
-  location: z.string().min(3, 'Informe a localização'),
-  latitude: z.number().optional(),
-  longitude: z.number().optional(),
-  objectives: z.array(z.string()).min(1, 'Selecione pelo menos um objetivo'),
-  description: z.string().min(10, 'Descreva o ambiente com mais detalhes'),
-  area: z.string().min(1, 'Informe a área (m²)'),
-  height: z.string().min(1, 'Informe o pé-direito (m)'),
-  sunPosition: z.string().default('tarde'),
-  ceilingType: z.string().default('laje'),
-});
+declare global {
+  interface Window {
+    google: any;
+  }
+}
 
-type FormValues = z.infer<typeof formSchema>;
+interface EnvironmentFormProps {
+  onSubmit: (data: EnvironmentFormData, images: File[], planta?: File) => void;
+  isLoading?: boolean;
+}
 
-const roomTypes: { value: RoomType; label: string; icon: any }[] = [
-  { value: 'sala', label: 'Sala', icon: Home },
-  { value: 'quarto', label: 'Quarto', icon: Bed },
-  { value: 'escritorio', label: 'Escritório', icon: Monitor },
-  { value: 'cozinha', label: 'Cozinha', icon: Utensils },
-  { value: 'banheiro', label: 'Banheiro', icon: Bath },
-  { value: 'varanda', label: 'Varanda', icon: Building2 },
-];
-
-const objectivesList = [
-  { value: 'iluminacao_natural', label: 'Mais iluminação natural', icon: Sun },
-  { value: 'menos_calor', label: 'Menos calor', icon: Flame },
-  { value: 'conforto_termico', label: 'Mais conforto térmico', icon: Thermometer },
-  { value: 'estetica', label: 'Melhor estética', icon: Palette },
-  { value: 'sustentabilidade', label: 'Sustentabilidade', icon: Leaf },
-];
-
-export default function EnvironmentForm() {
-  const { formData, updateFormData, setCurrentStep } = useAnalysis();
-  const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
-  const suggestionsRef = useRef<HTMLDivElement>(null);
-  const searchTimeout = useRef<NodeJS.Timeout | null>(null);
-
-  const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      ...formData,
-      objectives: formData.objectives || [],
-    }
+export default function EnvironmentForm({ onSubmit, isLoading }: EnvironmentFormProps) {
+  const [formData, setFormData] = useState<EnvironmentFormData>({
+    roomType: 'residencia',
+    interventionType: 'construcao',
+    location: '',
+    description: '',
+    area: '',
+    height: '',
+    ceilingType: 'Laje de concreto',
+    sunPosition: 'Tarde (Oeste - Mais quente)',
+    objectives: []
   });
 
-  const selectedObjectives = watch('objectives') || [];
+  const [ambienteFiles, setAmbienteFiles] = useState<File[]>([]);
+  const [plantaFile, setPlantaFile] = useState<File | null>(null);
+  const autocompleteRef = useRef<any>(null);
 
-  const handleSearchAddress = (query: string) => {
-    if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    if (query.length < 3) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
+  // Restauração do Autocomplete (Caminho Reverso)
+  useEffect(() => {
+    const initAutocomplete = () => {
+      const inputElement = document.getElementById('location-input') as HTMLInputElement;
+      
+      if (window.google && window.google.maps && window.google.maps.places && inputElement) {
+        autocompleteRef.current = new window.google.maps.places.Autocomplete(inputElement, {
+          types: ['(cities)'],
+          componentRestrictions: { country: 'br' },
+          fields: ['formatted_address', 'geometry']
+        });
 
-    setIsSearching(true);
-    searchTimeout.current = setTimeout(async () => {
-      try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`
-        );
-        const data = await response.json();
-        setSuggestions(data);
-        setShowSuggestions(true);
-      } catch (error) {
-        console.error("Erro na busca de endereço");
-      } finally {
-        setIsSearching(false);
+        autocompleteRef.current.addListener('place_changed', () => {
+          const place = autocompleteRef.current.getPlace();
+          if (place && place.formatted_address) {
+            setFormData(prev => ({ ...prev, location: place.formatted_address }));
+          }
+        });
+
+        // Evita submissão acidental ao selecionar com Enter
+        inputElement.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') e.preventDefault();
+        });
       }
-    }, 500);
+    };
+
+    if (window.google?.maps?.places) {
+      initAutocomplete();
+    } else {
+      // Caso o script ainda esteja carregando
+      const timer = setInterval(() => {
+        if (window.google?.maps?.places) {
+          initAutocomplete();
+          clearInterval(timer);
+        }
+      }, 500);
+      return () => clearInterval(timer);
+    }
+  }, []);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(formData, ambienteFiles, plantaFile || undefined);
   };
 
-  const toggleObjective = (value: string) => {
-    const current = selectedObjectives;
-    const updated = current.includes(value)
-      ? current.filter((o) => o !== value)
-      : [...current, value];
-    setValue('objectives', updated);
-  };
-
-  const onSubmit = (data: FormValues) => {
-    updateFormData(data as Partial<EnvironmentFormData>);
-    setCurrentStep(2);
+  const toggleObjective = (obj: string) => {
+    const current = formData.objectives;
+    setFormData({
+      ...formData,
+      objectives: current.includes(obj) 
+        ? current.filter(i => i !== obj) 
+        : [...current, obj]
+    });
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="text-center space-y-2">
-        <h2 className="text-3xl font-display font-bold text-foreground">Dados do Ambiente</h2>
-        <p className="text-muted-foreground">Insira as medidas e localização para uma análise bioclimática precisa.</p>
-      </div>
+    <form onSubmit={handleSubmit} className="max-w-4xl mx-auto space-y-10 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans">
+      
+      {/* 1. FINALIDADE E TIPO (Botões Modernos) */}
+      <section className="space-y-6">
+        <div className="space-y-4">
+          <Label className="text-lg font-black uppercase tracking-tight text-slate-500 flex items-center gap-2">
+            <Home className="w-5 h-5 text-primary" /> Finalidade do Ambiente
+          </Label>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { id: 'residencia', label: 'Residencial', icon: Home },
+              { id: 'academia', label: 'Academia', icon: Dumbbell },
+              { id: 'comercio', label: 'Comercial', icon: Building2 },
+              { id: 'escritorio', label: 'Escritório', icon: Briefcase },
+            ].map((type) => (
+              <button
+                key={type.id}
+                type="button"
+                onClick={() => setFormData({ ...formData, roomType: type.id as RoomType })}
+                className={`flex flex-col items-center justify-center p-5 rounded-2xl border-2 transition-all duration-300 ${
+                  formData.roomType === type.id 
+                  ? 'border-primary bg-primary/5 text-primary ring-4 ring-primary/5' 
+                  : 'border-slate-100 bg-white text-slate-400 hover:border-primary/40'
+                }`}
+              >
+                <type.icon className="w-7 h-7 mb-2" />
+                <span className="text-[10px] font-black uppercase tracking-widest">{type.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
 
-      {/* Tipo de Ambiente */}
-      <div className="space-y-4">
-        <Label className="text-foreground font-medium text-lg">Qual o ambiente?</Label>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {roomTypes.map((room) => (
+        <div className="grid md:grid-cols-2 gap-4">
+          {[
+            { id: 'construcao', label: 'Obra Nova', icon: Construction, desc: 'Planejamento do zero' },
+            { id: 'retrofit', label: 'Retrofit', icon: RefreshCw, desc: 'Reforma e melhoria técnica' },
+          ].map((type) => (
             <button
-              key={room.value}
+              key={type.id}
               type="button"
-              onClick={() => setValue('roomType', room.value)}
-              className={`flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all hover:border-primary/50 bg-card ${watch('roomType') === room.value ? 'border-primary bg-primary/5' : 'border-border'}`}
-            >
-              <room.icon className="w-6 h-6 text-primary" />
-              <span className="text-sm font-medium">{room.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Localização e Medidas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-2 relative" ref={suggestionsRef}>
-          <Label htmlFor="location">Localização (Cidade/UF) *</Label>
-          <div className="relative">
-            <Input
-              id="location"
-              placeholder="Ex: Araguaína, TO"
-              {...register('location')}
-              onChange={(e) => {
-                register('location').onChange(e);
-                handleSearchAddress(e.target.value);
-              }}
-              autoComplete="off"
-              className="bg-background"
-            />
-            {isSearching && <Loader2 className="absolute right-3 top-3 w-4 h-4 animate-spin text-muted-foreground" />}
-          </div>
-          {showSuggestions && (
-            <div className="absolute z-50 w-full bg-card border rounded-md mt-1 shadow-lg max-h-40 overflow-y-auto">
-              {suggestions.map((item) => (
-                <button
-                  key={item.place_id}
-                  type="button"
-                  className="w-full text-left px-4 py-2 hover:bg-accent text-sm border-b last:border-0"
-                  onClick={() => {
-                    setValue('location', item.display_name);
-                    setValue('latitude', parseFloat(item.lat));
-                    setValue('longitude', parseFloat(item.lon));
-                    setShowSuggestions(false);
-                  }}
-                >
-                  {item.display_name}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-xl border">
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
-              <Ruler className="w-3 h-3"/> Área (m²)
-            </Label>
-            <Input type="number" step="0.1" {...register('area')} placeholder="Ex: 20" className="bg-background" />
-          </div>
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
-              <Ruler className="w-3 h-3"/> Pé-direito (m)
-            </Label>
-            <Input type="number" step="0.1" {...register('height')} placeholder="Ex: 2.7" className="bg-background" />
-          </div>
-        </div>
-      </div>
-
-      {/* Sol e Cobertura */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-2">
-          <Label className="flex items-center gap-2"><Sun className="w-4 h-4 text-orange-500"/> Sol Crítico</Label>
-          <Select value={watch('sunPosition')} onValueChange={(v) => setValue('sunPosition', v)}>
-            <SelectTrigger className="bg-background"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="manha">Manhã (Leste)</SelectItem>
-              <SelectItem value="tarde">Tarde (Oeste - Mais quente)</SelectItem>
-              <SelectItem value="dia_todo">Dia todo (Norte)</SelectItem>
-              <SelectItem value="pouca">Pouca incidência (Sul)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label className="flex items-center gap-2"><HouseIcon className="w-4 h-4 text-blue-500"/> Cobertura</Label>
-          <Select value={watch('ceilingType')} onValueChange={(v) => setValue('ceilingType', v)}>
-            <SelectTrigger className="bg-background"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="laje">Laje de Concreto</SelectItem>
-              <SelectItem value="telhado_ceramico">Telhado Cerâmico</SelectItem>
-              <SelectItem value="fibrocimento">Fibrocimento (Eternit)</SelectItem>
-              <SelectItem value="metalico">Telhado Metálico</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* Objetivos */}
-      <div className="space-y-3">
-        <Label className="text-foreground font-medium">Objetivos principais *</Label>
-        <div className="flex flex-wrap gap-2">
-          {objectivesList.map((obj) => (
-            <button
-              key={obj.value}
-              type="button"
-              onClick={() => toggleObjective(obj.value)}
-              className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
-                selectedObjectives.includes(obj.value) 
-                ? 'bg-primary text-primary-foreground border-primary shadow-md' 
-                : 'bg-background hover:border-primary/50 text-muted-foreground'
+              onClick={() => setFormData({ ...formData, interventionType: type.id as InterventionType })}
+              className={`flex items-center gap-4 p-5 rounded-2xl border-2 transition-all ${
+                formData.interventionType === type.id 
+                ? 'border-primary bg-primary/5 ring-4 ring-primary/5' 
+                : 'border-slate-100 bg-white hover:border-primary/40'
               }`}
             >
-              <span className="flex items-center gap-2">
-                <obj.icon className="w-3 h-3" /> {obj.label}
-              </span>
+              <div className={`p-3 rounded-xl ${formData.interventionType === type.id ? 'bg-primary text-white' : 'bg-slate-100 text-slate-400'}`}>
+                <type.icon className="w-6 h-6" />
+              </div>
+              <div className="text-left">
+                <p className={`text-sm font-black uppercase tracking-tight ${formData.interventionType === type.id ? 'text-primary' : 'text-slate-600'}`}>{type.label}</p>
+                <p className="text-[10px] font-medium text-slate-400">{type.desc}</p>
+              </div>
             </button>
           ))}
         </div>
-      </div>
+      </section>
 
-      <div className="space-y-2">
-        <Label htmlFor="description">Descrição das necessidades</Label>
-        <Textarea 
-          id="description" 
-          {...register('description')} 
-          placeholder="Ex: Ambiente abafado, pouca circulação de ar..."
-          className="min-h-[100px] bg-background" 
-        />
-      </div>
+      {/* 2. DADOS TÉCNICOS (Estilo Clean) */}
+      <Card className="overflow-hidden border-none shadow-2xl shadow-slate-200/50 bg-slate-50/50">
+        <CardContent className="p-8 space-y-8">
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
+                <MapPin className="w-3 h-3" /> Localização (Cidade/UF)
+              </Label>
+              <Input 
+                id="location-input"
+                placeholder="Busque sua cidade..." 
+                value={formData.location}
+                onChange={(e) => setFormData({...formData, location: e.target.value})}
+                required
+                autoComplete="off"
+                className="bg-white border-none h-12 text-base shadow-sm focus-visible:ring-primary font-medium text-slate-700"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
+                  <Maximize className="w-3 h-3" /> Área (m²)
+                </Label>
+                <Input 
+                  type="number" 
+                  value={formData.area}
+                  onChange={(e) => setFormData({...formData, area: e.target.value})}
+                  required
+                  className="bg-white border-none h-12 font-medium text-slate-700"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
+                  <Ruler className="w-3 h-3" /> Pé-direito (m)
+                </Label>
+                <Input 
+                  type="number" 
+                  step="0.1" 
+                  value={formData.height}
+                  onChange={(e) => setFormData({...formData, height: e.target.value})}
+                  required
+                  className="bg-white border-none h-12 font-medium text-slate-700"
+                />
+              </div>
+            </div>
+          </div>
 
-      <div className="flex justify-between pt-4">
-        <Button type="button" variant="ghost" onClick={() => setCurrentStep(0)} className="gap-2">
-          <ArrowLeft className="w-4 h-4" /> Voltar
-        </Button>
-        <Button type="submit" className="gap-2 px-8">
-          Iniciar Análise Profissional <ArrowRight className="w-4 h-4" />
-        </Button>
-      </div>
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Incidência Solar Crítica</Label>
+              <Select onValueChange={(v) => setFormData({...formData, sunPosition: v})} defaultValue={formData.sunPosition}>
+                <SelectTrigger className="bg-white border-none h-12 font-medium text-slate-700 shadow-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Manhã (Leste)">Manhã (Leste)</SelectItem>
+                  <SelectItem value="Tarde (Oeste - Mais quente)">Tarde (Oeste - Mais quente)</SelectItem>
+                  <SelectItem value="Norte (Sol o dia todo)">Norte (Sol o dia todo)</SelectItem>
+                  <SelectItem value="Sul (Pouca incidência)">Sul (Pouca incidência)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Tipo de Cobertura</Label>
+              <Select onValueChange={(v) => setFormData({...formData, ceilingType: v})} defaultValue={formData.ceilingType}>
+                <SelectTrigger className="bg-white border-none h-12 font-medium text-slate-700 shadow-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Laje de Concreto">Laje de Concreto</SelectItem>
+                  <SelectItem value="Telha Cerâmica">Telha Cerâmica</SelectItem>
+                  <SelectItem value="Telha Metálica/Sanduíche">Telha Metálica/Sanduíche</SelectItem>
+                  <SelectItem value="Vidro / Policarbonato">Vidro / Policarbonato</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 3. UPLOADS (Design de Prancheta) */}
+      <section className="space-y-4">
+        <Label className="text-lg font-black uppercase tracking-tight text-slate-500 flex items-center gap-2">
+          <Upload className="w-5 h-5 text-primary" /> Documentação do Local
+        </Label>
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="relative group">
+            <input 
+              type="file" 
+              accept="image/*"
+              onChange={(e) => setPlantaFile(e.target.files?.[0] || null)}
+              className="absolute inset-0 opacity-0 cursor-pointer z-10"
+            />
+            <div className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all ${plantaFile ? 'border-primary bg-primary/5' : 'border-slate-200 bg-white group-hover:border-primary/40'}`}>
+              <FileText className={`w-8 h-8 mx-auto mb-3 ${plantaFile ? 'text-primary' : 'text-slate-300'}`} />
+              <p className="text-xs font-black uppercase tracking-widest text-slate-500">{plantaFile ? plantaFile.name : 'Subir Planta Baixa'}</p>
+            </div>
+          </div>
+
+          <div className="relative group">
+            <input 
+              type="file" 
+              multiple 
+              accept="image/*"
+              onChange={(e) => setAmbienteFiles(Array.from(e.target.files || []))}
+              className="absolute inset-0 opacity-0 cursor-pointer z-10"
+            />
+            <div className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all ${ambienteFiles.length > 0 ? 'border-primary bg-primary/5' : 'border-slate-200 bg-white group-hover:border-primary/40'}`}>
+              <Upload className={`w-8 h-8 mx-auto mb-3 ${ambienteFiles.length > 0 ? 'text-primary' : 'text-slate-300'}`} />
+              <p className="text-xs font-black uppercase tracking-widest text-slate-500">
+                {ambienteFiles.length > 0 ? `${ambienteFiles.length} fotos selecionadas` : 'Fotos do Ambiente'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 4. DESCRIÇÃO E OBJETIVOS */}
+      <section className="space-y-6">
+        <div className="space-y-3">
+          <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Prioridades do Projeto</Label>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { id: 'luz', label: 'Luz natural', icon: Sun },
+              { id: 'frio', label: 'Conforto térmico', icon: Waves },
+              { id: 'sustentavel', label: 'Eficiência energética', icon: Leaf },
+            ].map((obj) => (
+              <button
+                key={obj.id}
+                type="button"
+                onClick={() => toggleObjective(obj.label)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full border text-[10px] font-black uppercase tracking-widest transition-all ${
+                  formData.objectives.includes(obj.label)
+                  ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20'
+                  : 'bg-white text-slate-400 border-slate-200 hover:border-primary/40'
+                }`}
+              >
+                <obj.icon className="w-3 h-3" />
+                {obj.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Análise do Entorno (Vizinhança, Árvores, Ruído)</Label>
+          <Textarea 
+            placeholder="Ex: Área com vegetação densa, vizinhos colados, alta incidência de vento sul..." 
+            value={formData.description}
+            onChange={(e) => setFormData({...formData, description: e.target.value})}
+            className="min-h-[120px] bg-white border-slate-100 rounded-2xl p-4 shadow-sm text-slate-600 focus-visible:ring-primary"
+          />
+        </div>
+      </section>
+
+      <Button 
+        type="submit" 
+        className="w-full h-16 text-sm font-black uppercase tracking-[0.3em] rounded-2xl shadow-2xl transition-all hover:scale-[1.01] active:scale-[0.99] bg-primary hover:bg-primary/90"
+        disabled={isLoading}
+      >
+        {isLoading ? 'Auditando Estruturas...' : 'Gerar Diagnóstico Ambiental'}
+      </Button>
     </form>
   );
 }

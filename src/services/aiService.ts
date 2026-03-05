@@ -4,20 +4,20 @@ import { resizeImage, fileToGenerativePart } from "@/utils/imageUtils";
 
 const MODEL_NAME = "gemini-2.0-flash";
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const genAI = new GoogleGenerativeAI(API_KEY || "");
 
-const SYSTEM_INSTRUCTION = `Você é uma Auditora Técnica de Engenharia Ambiental.
-Sua função não é dar dicas de decoração, mas sim identificar FALHAS estruturais e propor soluções de ALTA PERFORMANCE baseadas na NBR 15220.
+if (!API_KEY) throw new Error("VITE_GEMINI_API_KEY não configurada.");
+const genAI = new GoogleGenerativeAI(API_KEY);
 
-PROIBIÇÕES RÍGIDAS:
-- Proibido sugerir "tintas claras", "plantas" ou "abrir janelas" de forma genérica.
-- Proibido ignorar erros normativos.
+const SYSTEM_INSTRUCTION = `Você é uma Auditora Técnica de Engenharia Ambiental e Consultora de Startups.
+Sua missão é realizar diagnósticos de ALTA PERFORMANCE baseados na NBR 15220 e eficiência energética.
 
-EXIGÊNCIAS:
-- Se o pé-direito for inferior a 2.40m, o campo 'summary' DEVE começar com: "🚨 VIOLAÇÃO NORMATIVA DETECTADA".
-- Identifique na foto/planta se há obstáculos à ventilação (móveis, paredes próximas).
-- Sugira materiais com valores de Transmitância Térmica (U) específicos.
-- Responda apenas em JSON puro.`;
+⚠️ DIRETRIZES DE AUDITORIA CRÍTICA:
+1. PÉ-DIREITO: Se o valor informado for < 2.40m, o campo "summary" DEVE iniciar com "🚨 VIOLAÇÃO NORMATIVA: Pé-direito insuficiente". Explique o risco de estratificação de calor.
+2. FINALIDADE (ACADEMIA): Se for Academia, considere o alto ganho de calor metabólico. Proíba soluções genéricas como "plantas". Exija vidros de alta performance ou ventilação forçada.
+3. ENTORNO E MANUTENÇÃO: Analise o entorno (arborizado, litoral, urbano). Se houver árvores e vidro, ALERTE sobre acúmulo de detritos, fezes de aves e custos de limpeza.
+4. RETROFIT vs CONSTRUÇÃO: Para Retrofit, foque em brises, películas e isolamentos internos. Para Construção, sugira mudanças na orientação das aberturas.
+
+Responda APENAS em JSON puro, sem markdown.`;
 
 export async function generateAnalysis(
   formData: EnvironmentFormData,
@@ -30,55 +30,59 @@ export async function generateAnalysis(
   const height = Number(formData.height);
   const deltaT = Math.max((weatherData?.temp || 30) - 24, 5);
   const cargaCalculada = Math.round(2.5 * (area * 1.2) * deltaT);
-  
-  // Detecção de erro no código para reforçar no prompt
-  const isIllegalHeight = height < 2.40;
+
+  const model = genAI.getGenerativeModel({
+    model: MODEL_NAME,
+    systemInstruction: SYSTEM_INSTRUCTION,
+  });
+
+  // Processamento de Imagens (Ambiente + Planta)
+  const imageParts = await Promise.all([
+    ...ambienteFiles.map(async (f) => fileToGenerativePart(await resizeImage(f))),
+    ...(plantaFile ? [fileToGenerativePart(await resizeImage(plantaFile))] : [])
+  ]);
 
   const prompt = `
-    AUDITORIA TÉCNICA: ${formData.location}
-    Pé-direito informado: ${height}m. (Mínimo NBR: 2.40m).
-    Carga calculada: ${cargaCalculada}W.
-    
-    INSTRUÇÃO DE ANÁLISE:
-    1. O pé-direito de ${height}m é aceitável? Se não, explique o impacto no acúmulo de calor (efeito estufa interno).
-    2. Analise a imagem: a posição das aberturas permite ventilação cruzada real ou apenas estagnada?
-    3. Recomende 3 materiais de construção (especificando o material, ex: lã de rocha, vidro duplo low-e) que reduziriam os ${cargaCalculada}W.
+    DADOS DA AUDITORIA:
+    - Local: ${formData.location} (Considere o microclima e entorno: ${formData.description})
+    - Uso: ${formData.roomType.toUpperCase()} | Intervenção: ${formData.interventionType}
+    - Medidas: ${area}m² x ${height}m. Carga Estimada: ${cargaCalculada}W.
 
-    ESTRUTURA JSON (MANTENHA OS NOMES DAS CHAVES):
+    TAREFA TÉCNICA:
+    1. Analise as fotos e a planta baixa: há ventilação cruzada efetiva?
+    2. O pé-direito de ${height}m é adequado para uma ${formData.roomType}? 
+    3. Quais os riscos de manutenção e patologias para este design no local ${formData.location}?
+    
+    ESTRUTURA JSON:
     {
       "summary": "",
       "climate": { "climate": "", "bioclimaticZone": "", "solarIncidence": "", "criticalPoints": [] },
       "lighting": { "naturalLight": [], "artificialLight": { "lampType": "", "colorTemperature": "", "distribution": "" } },
-      "thermal": { "loadEstimate": "${cargaCalculada}W", "passiveStrategies": [], "recommendedMaterials": [], "simpleAdjustments": [] },
+      "thermal": { "loadEstimate": "${cargaCalculada}W", "passiveStrategies": [], "recommendedMaterials": [], "simpleAdjustments": [], "maintenanceAlerts": [] },
       "materials": { "lighting": [], "ventilation": [], "finishes": [], "shading": [] },
-      "disclaimer": "NBR 15220 aplicada."
+      "disclaimer": "Análise técnica preliminar baseada na NBR 15220."
     }
   `;
 
-  const model = genAI.getGenerativeModel({ 
-    model: MODEL_NAME,
-    systemInstruction: SYSTEM_INSTRUCTION 
-  });
+  try {
+    const result = await model.generateContent([prompt, ...imageParts]);
+    let text = result.response.text().trim();
+    if (text.startsWith("```")) text = text.replace(/^```json/i, "").replace(/```$/g, "").trim();
 
-  const imageParts = await Promise.all([
-    ...ambienteFiles.map(async (f) => fileToGenerativePart(await resizeImage(f))),
-    ...(plantaFile ? [fileToGenerativePart(await resizeImage(await resizeImage(plantaFile)))] : [])
-  ]);
+    const parsed = JSON.parse(text);
 
-  const result = await model.generateContent([prompt, ...imageParts]);
-  let text = result.response.text().trim();
-  
-  // Limpeza de Markdown (Crasas)
-  if (text.startsWith("```")) {
-    text = text.replace(/^```json/i, "").replace(/```$/g, "").trim();
+    return {
+      id: `anls-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      isCertified: false,
+      ...parsed,
+      thermal: {
+        ...parsed.thermal,
+        loadEstimate: `${cargaCalculada}W`
+      }
+    };
+  } catch (error) {
+    console.error("Erro na Auditoria:", error);
+    throw error;
   }
-
-  const parsed = JSON.parse(text);
-
-  return {
-    id: `anls-${Date.now()}`,
-    createdAt: new Date().toISOString(),
-    ...parsed,
-    thermal: { ...parsed.thermal, loadEstimate: `${cargaCalculada}W` }
-  };
 }

@@ -1,94 +1,120 @@
-import { Link } from 'react-router-dom';
-import { ArrowLeft, Leaf } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { AnalysisProvider, useAnalysis } from '@/contexts/AnalysisContext';
-import ImageUpload from '@/components/analysis/ImageUpload';
+import React, { useState } from 'react';
+import { ClipboardList, Microchip, FileCheck, Check } from 'lucide-react'; // Ícones para as etapas
 import EnvironmentForm from '@/components/analysis/EnvironmentForm';
 import ProcessingScreen from '@/components/analysis/ProcessingScreen';
 import ResultsDisplay from '@/components/analysis/ResultsDisplay';
+import { useAnalysis } from '@/contexts/AnalysisContext';
+import { generateAnalysis } from '@/services/aiService';
+import { toast } from 'sonner';
 
-const steps = [
-  { id: 0, label: 'Upload' },
-  { id: 1, label: 'Dados' },
-  { id: 2, label: 'Análise' },
-  { id: 3, label: 'Resultado' },
-];
+export default function Analysis() {
+  const { setResult } = useAnalysis();
+  const [step, setStep] = useState<'form' | 'processing' | 'result'>('form');
+  const [isLoading, setIsLoading] = useState(false);
 
-function AnalysisContent() {
-  const { currentStep } = useAnalysis();
+  const handleFormSubmit = async (formData: any, images: File[], planta?: File) => {
+    if (images.length === 0) {
+      toast.error("Por favor, adicione ao menos uma foto do ambiente.");
+      return;
+    }
+
+    setIsLoading(true);
+    setStep('processing');
+
+    try {
+      const weatherData = { temp: 32, humidade: 45 }; 
+      const analysis = await generateAnalysis(formData, weatherData, images, planta);
+      
+      setResult(analysis);
+      setStep('result');
+    } catch (error) {
+      console.error("Erro na análise:", error);
+      toast.error("Falha ao gerar diagnóstico.");
+      setStep('form');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border/50 bg-background/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl gradient-nature flex items-center justify-center">
-              <Leaf className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <span className="font-display text-xl font-bold text-foreground">
-              Nexus-X
-            </span>
-          </Link>
-          <Link to="/">
-            <Button variant="ghost" size="sm" className="gap-2">
-              <ArrowLeft className="w-4 h-4" />
-              Voltar ao Início
-            </Button>
-          </Link>
-        </div>
-      </header>
-
-      {/* Progress Steps */}
-      <div className="border-b border-border/50 bg-card/50">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-center gap-2 sm:gap-4">
-            {steps.map((step, index) => (
-              <div key={step.id} className="flex items-center">
-                <div className="flex items-center gap-2">
-                  <div 
-                    className={`
-                      w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors
-                      ${currentStep >= step.id 
-                        ? 'bg-primary text-primary-foreground' 
-                        : 'bg-muted text-muted-foreground'
-                      }
-                    `}
-                  >
-                    {step.id + 1}
-                  </div>
-                  <span className={`hidden sm:block text-sm font-medium ${
-                    currentStep >= step.id ? 'text-foreground' : 'text-muted-foreground'
-                  }`}>
-                    {step.label}
-                  </span>
-                </div>
-                {index < steps.length - 1 && (
-                  <div className={`w-8 sm:w-16 h-0.5 mx-2 ${
-                    currentStep > step.id ? 'bg-primary' : 'bg-muted'
-                  }`} />
-                )}
-              </div>
-            ))}
+    <main className="min-h-screen bg-background py-12 px-4 font-sans">
+      <div className="max-w-4xl mx-auto">
+        
+        {/* STEPPER MODERNIZADO COM ÍCONES */}
+        <div className="flex justify-center mb-16">
+          <div className="flex items-center w-full max-w-2xl">
+            <StepItem 
+              label="Dados do Projeto" 
+              icon={ClipboardList} 
+              active={step === 'form'} 
+              completed={step !== 'form'} 
+            />
+            <StepDivider active={step !== 'form'} />
+            <StepItem 
+              label="Auditoria IA" 
+              icon={Microchip} 
+              active={step === 'processing'} 
+              completed={step === 'result'} 
+            />
+            <StepDivider active={step === 'result'} />
+            <StepItem 
+              label="Diagnóstico" 
+              icon={FileCheck} 
+              active={step === 'result'} 
+              completed={false} 
+            />
           </div>
         </div>
-      </div>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8 max-w-3xl">
-        {currentStep === 0 && <ImageUpload />}
-        {currentStep === 1 && <EnvironmentForm />}
-        {currentStep === 2 && <ProcessingScreen />}
-        {currentStep === 3 && <ResultsDisplay />}
-      </main>
+        {/* TELAS */}
+        <div className="transition-all duration-700 ease-in-out">
+          {step === 'form' && (
+            <EnvironmentForm onSubmit={handleFormSubmit} isLoading={isLoading} />
+          )}
+
+          {step === 'processing' && (
+            <div className="animate-in fade-in zoom-in duration-500">
+              <ProcessingScreen />
+            </div>
+          )}
+
+          {step === 'result' && (
+            <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
+              <ResultsDisplay />
+            </div>
+          )}
+        </div>
+      </div>
+    </main>
+  );
+}
+
+// COMPONENTE DA "BOLINHA" COM ÍCONE
+function StepItem({ label, icon: Icon, active, completed }: { label: string, icon: any, active: boolean, completed: boolean }) {
+  return (
+    <div className="flex flex-col items-center relative z-10">
+      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border-2 transition-all duration-500 shadow-sm ${
+        active 
+          ? 'border-primary bg-primary text-white scale-110 shadow-primary/20 ring-4 ring-primary/5' 
+          : completed 
+            ? 'border-primary/40 bg-primary/10 text-primary' 
+            : 'border-muted bg-background text-muted-foreground/40'
+      }`}>
+        {completed ? <Check className="w-6 h-6" /> : <Icon className="w-6 h-6" />}
+      </div>
+      <span className={`text-[11px] mt-3 font-bold uppercase tracking-widest text-center max-w-[80px] leading-tight transition-colors duration-500 ${
+        active ? 'text-primary' : 'text-slate-400'
+      }`}>
+        {label}
+      </span>
     </div>
   );
 }
 
-export default function Analysis() {
+function StepDivider({ active }: { active: boolean }) {
   return (
-    <AnalysisProvider>
-      <AnalysisContent />
-    </AnalysisProvider>
+    <div className="flex-1 h-[2px] mx-[-10px] mb-8 bg-slate-100 relative overflow-hidden">
+      <div className={`absolute inset-0 bg-primary transition-all duration-1000 ease-in-out ${active ? 'translate-x-0' : '-translate-x-full'}`} />
+    </div>
   );
 }
