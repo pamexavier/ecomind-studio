@@ -1,6 +1,5 @@
 /**
- * Redimensiona a imagem para um máximo de 1024px e comprime para JPEG.
- * Isso reduz o custo de tokens em até 70% por imagem.
+ * Redimensiona a imagem para otimizar tokens e velocidade.
  */
 export async function resizeImage(file: File, maxWidth = 1024): Promise<Blob> {
   return new Promise((resolve, reject) => {
@@ -31,7 +30,7 @@ export async function resizeImage(file: File, maxWidth = 1024): Promise<Blob> {
         }
 
         canvas.toBlob(
-          (blob) => blob ? resolve(blob) : reject(new Error("Erro no Blob")),
+          (blob) => blob ? resolve(blob) : reject(new Error("Erro ao processar imagem")),
           "image/jpeg",
           0.8
         );
@@ -41,7 +40,7 @@ export async function resizeImage(file: File, maxWidth = 1024): Promise<Blob> {
 }
 
 /**
- * Converte o Blob redimensionado para o formato Base64 exigido pelo Gemini.
+ * Converte para o formato que a IA entende.
  */
 export async function fileToGenerativePart(blob: Blob) {
   const base64Data = await new Promise<string>((resolve) => {

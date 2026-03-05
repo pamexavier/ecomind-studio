@@ -2,28 +2,23 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { EnvironmentFormData, AnalysisResult } from "@/types/analysis";
 import { resizeImage, fileToGenerativePart } from "@/utils/imageUtils";
 
-// 1. Configurações Iniciais e Instância da IA
 const MODEL_NAME = "gemini-2.0-flash";
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const genAI = new GoogleGenerativeAI(API_KEY || "");
 
-if (!API_KEY) {
-  throw new Error("VITE_GEMINI_API_KEY não configurada no arquivo .env");
-}
+const SYSTEM_INSTRUCTION = `Você é uma Auditora Técnica de Engenharia Ambiental.
+Sua função não é dar dicas de decoração, mas sim identificar FALHAS estruturais e propor soluções de ALTA PERFORMANCE baseadas na NBR 15220.
 
-const genAI = new GoogleGenerativeAI(API_KEY);
+PROIBIÇÕES RÍGIDAS:
+- Proibido sugerir "tintas claras", "plantas" ou "abrir janelas" de forma genérica.
+- Proibido ignorar erros normativos.
 
-// 2. Instrução de Sistema (Personalidade e Regras)
-const SYSTEM_INSTRUCTION = `Você é uma Engenheira Ambiental e Auditora Técnica especialista na NBR 15220:2023.
-Sua missão é analisar imagens (plantas e fotos) e dados técnicos para emitir laudos de conformidade térmica.
+EXIGÊNCIAS:
+- Se o pé-direito for inferior a 2.40m, o campo 'summary' DEVE começar com: "🚨 VIOLAÇÃO NORMATIVA DETECTADA".
+- Identifique na foto/planta se há obstáculos à ventilação (móveis, paredes próximas).
+- Sugira materiais com valores de Transmitância Térmica (U) específicos.
+- Responda apenas em JSON puro.`;
 
-REGRAS RÍGIDAS:
-1. Responda exclusivamente em formato JSON, seguindo a interface AnalysisResult.
-2. Identifique elementos térmicos visíveis: janelas (tamanho/orientação), materiais de parede e sombreamento.
-3. Se o pé-direito informado for < 2.40m, classifique obrigatoriamente como 'ERRO CRÍTICO'.
-4. Utilize terminologia técnica: Transmitância Térmica (U), Capacidade Térmica (C) e SRI.
-5. Sugira estratégias passivas como ventilação cruzada, efeito chaminé ou inércia térmica conforme a região.`;
-
-// 3. Função Principal de Análise
 export async function generateAnalysis(
   formData: EnvironmentFormData,
   weatherData: any,
@@ -31,70 +26,59 @@ export async function generateAnalysis(
   plantaFile?: File
 ): Promise<AnalysisResult> {
   
-  try {
-    // Lógica de cálculo determinística (Mastigando os dados para a IA)
-    const area = Number(formData.area);
-    const height = Number(formData.height);
-    const deltaT = Math.max((weatherData?.temp || 30) - 24, 5);
+  const area = Number(formData.area);
+  const height = Number(formData.height);
+  const deltaT = Math.max((weatherData?.temp || 30) - 24, 5);
+  const cargaCalculada = Math.round(2.5 * (area * 1.2) * deltaT);
+  
+  // Detecção de erro no código para reforçar no prompt
+  const isIllegalHeight = height < 2.40;
+
+  const prompt = `
+    AUDITORIA TÉCNICA: ${formData.location}
+    Pé-direito informado: ${height}m. (Mínimo NBR: 2.40m).
+    Carga calculada: ${cargaCalculada}W.
     
-    // Q = U * A * deltaT (Cálculo preciso feito no código)
-    const cargaCalculada = Math.round(2.5 * (area * 1.2) * deltaT);
-    const peDireitoStatus = height < 2.4 ? "ERRO CRÍTICO: Abaixo do mínimo legal (2.40m)" : "Conforme";
+    INSTRUÇÃO DE ANÁLISE:
+    1. O pé-direito de ${height}m é aceitável? Se não, explique o impacto no acúmulo de calor (efeito estufa interno).
+    2. Analise a imagem: a posição das aberturas permite ventilação cruzada real ou apenas estagnada?
+    3. Recomende 3 materiais de construção (especificando o material, ex: lã de rocha, vidro duplo low-e) que reduziriam os ${cargaCalculada}W.
 
-    // Inicializa o modelo com a Instrução de Sistema
-    const model = genAI.getGenerativeModel({
-      model: MODEL_NAME,
-      systemInstruction: SYSTEM_INSTRUCTION,
-    });
+    ESTRUTURA JSON (MANTENHA OS NOMES DAS CHAVES):
+    {
+      "summary": "",
+      "climate": { "climate": "", "bioclimaticZone": "", "solarIncidence": "", "criticalPoints": [] },
+      "lighting": { "naturalLight": [], "artificialLight": { "lampType": "", "colorTemperature": "", "distribution": "" } },
+      "thermal": { "loadEstimate": "${cargaCalculada}W", "passiveStrategies": [], "recommendedMaterials": [], "simpleAdjustments": [] },
+      "materials": { "lighting": [], "ventilation": [], "finishes": [], "shading": [] },
+      "disclaimer": "NBR 15220 aplicada."
+    }
+  `;
 
-    // Processamento otimizado de imagens (Redimensionamento + Base64)
-    const imageParts = await Promise.all([
-      ...ambienteFiles.map(async (f) => {
-        const resized = await resizeImage(f);
-        return fileToGenerativePart(resized);
-      }),
-      ...(plantaFile ? [resizeImage(plantaFile).then(fileToGenerativePart)] : [])
-    ]);
+  const model = genAI.getGenerativeModel({ 
+    model: MODEL_NAME,
+    systemInstruction: SYSTEM_INSTRUCTION 
+  });
 
-    // Prompt de Usuário (Apenas os fatos variáveis)
-    const userPrompt = `
-      DADOS DO AMBIENTE:
-      - Localização: ${formData.location}
-      - Medidas: ${area}m² de área com ${height}m de pé-direito (${peDireitoStatus}).
-      - Carga Térmica Estimada: ${cargaCalculada}W.
-      - Cobertura: ${formData.ceilingType}.
-      - Clima Atual: ${weatherData?.temp}°C com ${weatherData?.humidade}% de umidade.
+  const imageParts = await Promise.all([
+    ...ambienteFiles.map(async (f) => fileToGenerativePart(await resizeImage(f))),
+    ...(plantaFile ? [fileToGenerativePart(await resizeImage(await resizeImage(plantaFile)))] : [])
+  ]);
 
-      TAREFA: 
-      Com base nas fotos e planta anexadas, verifique a viabilidade de ventilação natural e sugira 3 materiais ou ajustes que reduziriam a carga térmica calculada.
-    `;
-
-    // Chamada para a API
-    const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: userPrompt }, ...imageParts] }],
-      generationConfig: {
-        temperature: 0.2, // Baixa temperatura para maior rigor técnico
-        responseMimeType: "application/json",
-      }
-    });
-
-    const responseText = result.response.text();
-    const parsed = JSON.parse(responseText);
-
-    // Retorno formatado conforme a interface AnalysisResult
-    return {
-      id: `anls-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      ...parsed,
-      thermal: {
-        ...parsed.thermal,
-        loadEstimate: `${cargaCalculada}W` // Inserindo o cálculo exato do código no relatório
-      },
-      disclaimer: "Análise técnica automatizada baseada na NBR 15220:2023."
-    };
-
-  } catch (error) {
-    console.error("Erro no aiService:", error);
-    throw error;
+  const result = await model.generateContent([prompt, ...imageParts]);
+  let text = result.response.text().trim();
+  
+  // Limpeza de Markdown (Crasas)
+  if (text.startsWith("```")) {
+    text = text.replace(/^```json/i, "").replace(/```$/g, "").trim();
   }
+
+  const parsed = JSON.parse(text);
+
+  return {
+    id: `anls-${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    ...parsed,
+    thermal: { ...parsed.thermal, loadEstimate: `${cargaCalculada}W` }
+  };
 }
